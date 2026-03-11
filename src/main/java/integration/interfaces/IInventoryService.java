@@ -1,27 +1,16 @@
 package integration.interfaces;
+import domain.CatalogueItem;
+
 import java.util.List;
 
 public interface IInventoryService {
 
-	List getCatalogue();
+	List<CatalogueItem> getCatalogue();
 
 	/**
 	 * 
 	 * @param itemID
-	 * @param quantity
 	 */
-	String reserveItemsforPurchase(String[] itemID, int[] quantity);
-
-	/**
-	 * 
-	 * @param reservationID
-	 */
-	boolean cancelReservedItems(String reservationID);
-
-	/**
-	 * 
-	 * @param reservationID
-	 */
-	String deductStock(String reservationID);
+	String deductStock(String itemID);
 
 }
