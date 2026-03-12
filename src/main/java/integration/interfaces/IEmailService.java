@@ -8,8 +8,8 @@ public interface IEmailService {
 	 * @param content
 	 * @param reference
 	 * @param sender
-	 * @param sybsystem
+	 * @param subsystem
 	 */
-	boolean produceEmail(String email, String content, String reference, String sender, String sybsystem);
+	boolean produceEmail(String email, String content, String reference, String sender, String subsystem);
 
 }
