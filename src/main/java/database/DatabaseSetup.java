@@ -8,6 +8,8 @@ import java.sql.Statement;
 
 public class DatabaseSetup {
 
+    //No need to touch this file
+
     public static void initialise() {
 
         try (Connection conn = DatabaseManager.getConnection();

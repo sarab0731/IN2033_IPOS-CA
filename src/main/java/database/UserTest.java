@@ -6,6 +6,8 @@ import java.sql.ResultSet;
 
 public class UserTest {
 
+    //Here you should create different methods to insert other elements.
+
     public static void insertUser(String username, String passwordHash, String fullName, String role) {
 
         String sql = """
@@ -61,4 +63,6 @@ public class UserTest {
             e.printStackTrace();
         }
     }
+
+    //here you can make new method to print other tables.
 }
