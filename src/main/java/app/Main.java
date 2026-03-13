@@ -15,7 +15,7 @@ public class Main {
         DatabaseSetup.initialise();
 
         // You can create new test items and test them here
-        UserTest.insertUser("admin2", "admin1234", "Admin Userr", "ADMIN");
+        UserTest.insertUser("admin3", "admin12345", "Admin Userrrrr", "ADMIN");
         UserTest.insertUser("pharm3", "pass1234", "Alice Smithh", "PHARMACIST");
 
         UserTest.printUsers();
