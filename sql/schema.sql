@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     full_name TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('PHARMACIST','ADMIN','MANAGER')),
+    user_role TEXT NOT NULL CHECK (user_role IN ('PHARMACIST','ADMIN','MANAGER')),
     is_active INTEGER NOT NULL DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
