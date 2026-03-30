@@ -4,6 +4,8 @@ import domain.Customer;
 import domain.Product;
 
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -150,5 +152,152 @@ public class SaleDB {
             e.printStackTrace();
         }
         return num;
+    }
+
+    /**
+     * Returns total turnover (sum of total_amount) for a date range.
+     */
+    public static double getTurnover(String fromDate, String toDate) {
+        String sql = """
+            SELECT COALESCE(SUM(total_amount), 0) AS turnover
+            FROM sales
+            WHERE DATE(sale_datetime) BETWEEN ? AND ?
+            """;
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, fromDate);
+            stmt.setString(2, toDate);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return rs.getDouble("turnover");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    /**
+     * Returns per-product sales breakdown for a date range.
+     * Each map entry: item_id, description, qty_sold, revenue.
+     */
+    public static List<Map<String, Object>> getSalesByProduct(String fromDate, String toDate) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        String sql = """
+            SELECT p.item_id, p.description,
+                   SUM(si.quantity) AS qty_sold,
+                   SUM(si.line_total) AS revenue
+            FROM sale_items si
+            JOIN products p ON si.product_id = p.product_id
+            JOIN sales s    ON si.sale_id     = s.sale_id
+            WHERE DATE(s.sale_datetime) BETWEEN ? AND ?
+            GROUP BY p.product_id
+            ORDER BY revenue DESC
+            """;
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, fromDate);
+            stmt.setString(2, toDate);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                Map<String, Object> row = new HashMap<>();
+                row.put("item_id", rs.getString("item_id"));
+                row.put("description", rs.getString("description"));
+                row.put("qty_sold", rs.getInt("qty_sold"));
+                row.put("revenue", rs.getDouble("revenue"));
+                results.add(row);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return results;
+    }
+
+    /**
+     * Generates a monthly statement for a customer covering a date range.
+     * Returns the statement number or null on failure.
+     */
+    public static String generateMonthlyStatement(int customerId, String periodStart,
+                                                   String periodEnd, double totalDue) {
+        String num = "STM-" + System.currentTimeMillis();
+        String sql = """
+            INSERT INTO monthly_statements
+                (statement_number, customer_id, period_start, period_end, total_due, status)
+            VALUES (?, ?, ?, ?, ?, 'GENERATED')
+            """;
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, num);
+            stmt.setInt(2, customerId);
+            stmt.setString(3, periodStart);
+            stmt.setString(4, periodEnd);
+            stmt.setDouble(5, totalDue);
+            stmt.executeUpdate();
+            return num;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Returns all unpaid/partially paid invoices for a customer.
+     */
+    public static List<Map<String, Object>> getUnpaidInvoices(int customerId) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        String sql = """
+            SELECT invoice_id, invoice_number, amount_due, status, invoice_date
+            FROM invoices
+            WHERE customer_id = ? AND status IN ('UNPAID', 'PARTIALLY_PAID', 'OVERDUE')
+            ORDER BY invoice_date
+            """;
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, customerId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                Map<String, Object> row = new HashMap<>();
+                row.put("invoice_id", rs.getInt("invoice_id"));
+                row.put("invoice_number", rs.getString("invoice_number"));
+                row.put("amount_due", rs.getDouble("amount_due"));
+                row.put("status", rs.getString("status"));
+                row.put("invoice_date", rs.getString("invoice_date"));
+                results.add(row);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return results;
+    }
+
+    /**
+     * Updates an invoice status (UNPAID, PARTIALLY_PAID, PAID, OVERDUE).
+     */
+    public static boolean updateInvoiceStatus(int invoiceId, String newStatus) {
+        String sql = "UPDATE invoices SET status = ? WHERE invoice_id = ?";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, newStatus);
+            stmt.setInt(2, invoiceId);
+            stmt.executeUpdate();
+            return true;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 }

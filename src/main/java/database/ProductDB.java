@@ -131,6 +131,73 @@ public class ProductDB {
         }
     }
 
+    /**
+     * Finds a product by its item_id (e.g. "PARA-500").
+     */
+    public static Product getByItemId(String itemId) {
+        String sql = "SELECT * FROM products WHERE item_id = ? AND is_active = 1";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, itemId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return mapRow(rs);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Finds a product by its internal product_id.
+     */
+    public static Product getById(int productId) {
+        String sql = "SELECT * FROM products WHERE product_id = ? AND is_active = 1";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, productId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return mapRow(rs);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Searches products by keyword in description or item_id.
+     */
+    public static List<Product> searchProducts(String keyword) {
+        List<Product> list = new ArrayList<>();
+        String sql = """
+            SELECT * FROM products
+            WHERE is_active = 1
+              AND (LOWER(description) LIKE ? OR LOWER(item_id) LIKE ?)
+            ORDER BY item_id
+            """;
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            String pattern = "%" + keyword.toLowerCase() + "%";
+            stmt.setString(1, pattern);
+            stmt.setString(2, pattern);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                list.add(mapRow(rs));
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
     private static Product mapRow(ResultSet rs) throws SQLException {
         return new Product(
                 rs.getInt("product_id"),

@@ -104,6 +104,82 @@ public class CustomerDB {
         }
     }
 
+    public static boolean recordAccountPayment(int customerId, int invoiceId,
+                                                   int recordedByUserId, String paymentMethod,
+                                                   double amount, String notes) {
+        String sql = """
+            INSERT INTO account_payments (customer_id, invoice_id, recorded_by_user_id,
+                payment_method, amount, notes)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """;
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, customerId);
+            if (invoiceId > 0)
+                stmt.setInt(2, invoiceId);
+            else
+                stmt.setNull(2, Types.INTEGER);
+            stmt.setInt(3, recordedByUserId);
+            stmt.setString(4, paymentMethod);
+            stmt.setDouble(5, amount);
+            stmt.setString(6, notes);
+            stmt.executeUpdate();
+            return true;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public static Customer getById(int customerId) {
+        String sql = "SELECT * FROM customer_accounts WHERE customer_id = ?";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, customerId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return mapRow(rs);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public static boolean updateCustomer(Customer c) {
+        String sql = """
+            UPDATE customer_accounts
+            SET full_name = ?, email = ?, phone = ?, address = ?,
+                credit_limit = ?, discount_plan_id = ?
+            WHERE customer_id = ?
+            """;
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, c.getFullName());
+            stmt.setString(2, c.getEmail());
+            stmt.setString(3, c.getPhone());
+            stmt.setString(4, c.getAddress());
+            stmt.setDouble(5, c.getCreditLimit());
+            if (c.getDiscountPlanId() > 0)
+                stmt.setInt(6, c.getDiscountPlanId());
+            else
+                stmt.setNull(6, Types.INTEGER);
+            stmt.setInt(7, c.getCustomerId());
+            stmt.executeUpdate();
+            return true;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     private static Customer mapRow(ResultSet rs) throws SQLException {
         return new Customer(
                 rs.getInt("customer_id"),

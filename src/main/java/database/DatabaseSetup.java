@@ -20,7 +20,13 @@ public class DatabaseSetup {
             stmt.execute("PRAGMA foreign_keys = ON;");
 
             String sql = Files.readString(Paths.get("sql/schema.sql"));
-            stmt.executeUpdate(sql);
+            String[] statements = sql.split(";");
+            for (String s : statements) {
+                String trimmed = s.trim();
+                if (!trimmed.isEmpty()) {
+                    stmt.executeUpdate(trimmed);
+                }
+            }
 
             conn.commit();
             System.out.println("Database initialised.");

@@ -105,6 +105,7 @@ public class RestockOrderDB {
     /**
      * Updates order status and logs it in order_status_history.
      * Valid transitions: ACCEPTED -> PROCESSED -> DISPATCHED -> DELIVERED
+     * When status becomes DELIVERED, stock quantities are automatically updated.
      */
     public static boolean updateStatus(int restockOrderId, String oldStatus, String newStatus) {
         String updateSql  = "UPDATE restock_orders SET status = ? WHERE restock_order_id = ?";
@@ -127,6 +128,10 @@ public class RestockOrderDB {
             histStmt.setString(3, newStatus);
             histStmt.executeUpdate();
 
+            if ("DELIVERED".equals(newStatus)) {
+                receiveStock(conn, restockOrderId);
+            }
+
             conn.commit();
             return true;
 
@@ -134,5 +139,81 @@ public class RestockOrderDB {
             e.printStackTrace();
             return false;
         }
+    }
+
+    /**
+     * When an order is delivered, add the ordered quantities back into product stock.
+     */
+    private static void receiveStock(Connection conn, int restockOrderId) throws SQLException {
+        String itemsSql = "SELECT product_id, quantity FROM restock_order_items WHERE restock_order_id = ?";
+        String stockSql = "UPDATE products SET stock_quantity = stock_quantity + ? WHERE product_id = ?";
+
+        PreparedStatement itemsStmt = conn.prepareStatement(itemsSql);
+        itemsStmt.setInt(1, restockOrderId);
+        ResultSet rs = itemsStmt.executeQuery();
+
+        PreparedStatement stockStmt = conn.prepareStatement(stockSql);
+        while (rs.next()) {
+            stockStmt.setInt(1, rs.getInt("quantity"));
+            stockStmt.setInt(2, rs.getInt("product_id"));
+            stockStmt.executeUpdate();
+        }
+    }
+
+    /**
+     * Gets a single order by its order number.
+     */
+    public static RestockOrder getByOrderNumber(String orderNumber) {
+        String sql = "SELECT * FROM restock_orders WHERE order_number = ?";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, orderNumber);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return new RestockOrder(
+                        rs.getInt("restock_order_id"),
+                        rs.getString("order_number"),
+                        rs.getString("merchant_id"),
+                        rs.getString("status"),
+                        rs.getDouble("total_value"),
+                        rs.getString("created_at")
+                );
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Returns orders filtered by status.
+     */
+    public static List<RestockOrder> getOrdersByStatus(String status) {
+        List<RestockOrder> list = new ArrayList<>();
+        String sql = "SELECT * FROM restock_orders WHERE status = ? ORDER BY created_at DESC";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, status);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                list.add(new RestockOrder(
+                        rs.getInt("restock_order_id"),
+                        rs.getString("order_number"),
+                        rs.getString("merchant_id"),
+                        rs.getString("status"),
+                        rs.getDouble("total_value"),
+                        rs.getString("created_at")
+                ));
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
     }
 }
