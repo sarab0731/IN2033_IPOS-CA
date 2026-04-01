@@ -7,69 +7,88 @@ import domain.Customer;
 import domain.Product;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.List;
 
 public class ReportsPanel extends JPanel {
 
     public ReportsPanel(ScreenRouter router) {
         setLayout(new BorderLayout());
+        setBackground(new Color(242, 242, 242));
 
-        // --- HEADER ---
-        JPanel header = new JPanel(new BorderLayout());
-        JLabel title = new JLabel("Reports", SwingConstants.CENTER);
-        title.setFont(new Font("SansSerif", Font.BOLD, 28));
-        JButton backBtn = new JButton("Back");
-        backBtn.addActionListener(e -> router.goTo(MainFrame.SCREEN_DASHBOARD));
-        header.add(backBtn, BorderLayout.WEST);
-        header.add(title, BorderLayout.CENTER);
-        add(header, BorderLayout.NORTH);
+        JPanel reportsContent = buildReportsContent();
 
-        // --- TABS ---
-        JTabbedPane tabs = new JTabbedPane();
-        tabs.addTab("Turnover",           buildTurnoverTab());
-        tabs.addTab("Stock Availability", buildStockTab());
-        tabs.addTab("Customer Debt",      buildDebtTab());
-        add(tabs, BorderLayout.CENTER);
+        AppShell shell = new AppShell(
+                router,
+                MainFrame.SCREEN_REPORTS,
+                "Reports",
+                "Generate sales, stock, and debt reports",
+                reportsContent
+        );
+
+        add(shell, BorderLayout.CENTER);
     }
 
-    // ----------------------------------------------------------------
-    // TAB 1 — Sales turnover for a given period
-    // ----------------------------------------------------------------
-    private JPanel buildTurnoverTab() {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+    private JPanel buildReportsContent() {
+        JPanel outer = new JPanel(new BorderLayout());
+        outer.setOpaque(false);
 
-        // date filter row
-        JPanel filterRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 6));
+        JTabbedPane tabs = new JTabbedPane();
+        tabs.addTab("Turnover", buildTurnoverTab());
+        tabs.addTab("Stock Availability", buildStockTab());
+        tabs.addTab("Customer Debt", buildDebtTab());
+
+        outer.add(tabs, BorderLayout.CENTER);
+        return outer;
+    }
+
+    private JPanel buildTurnoverTab() {
+        JPanel outer = new JPanel(new BorderLayout());
+        outer.setOpaque(false);
+
+        JPanel card = AppShell.createCard();
+        card.setLayout(new BorderLayout(0, 18));
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(232, 232, 232)),
+                new EmptyBorder(20, 20, 20, 20)
+        ));
+
+        JPanel filterRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        filterRow.setOpaque(false);
+
+        JTextField fromField = buildTextField("2024-01-01", 12);
+        JTextField toField = buildTextField("2099-12-31", 12);
+        JButton runBtn = buildDarkButton("Generate");
+
         filterRow.add(new JLabel("From (YYYY-MM-DD):"));
-        JTextField fromField = new JTextField("2024-01-01", 12);
         filterRow.add(fromField);
         filterRow.add(new JLabel("To (YYYY-MM-DD):"));
-        JTextField toField = new JTextField("2099-12-31", 12);
         filterRow.add(toField);
-        JButton runBtn = new JButton("Generate");
         filterRow.add(runBtn);
-        panel.add(filterRow, BorderLayout.NORTH);
 
-        // results table
         String[] cols = {"Item ID", "Description", "Qty Sold", "Revenue £"};
         DefaultTableModel model = new DefaultTableModel(cols, 0) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
+            @Override
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
         };
+
         JTable table = new JTable(model);
-        table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
-        panel.add(new JScrollPane(table), BorderLayout.CENTER);
+        styleTable(table);
 
         JLabel totalLabel = new JLabel(" ", SwingConstants.RIGHT);
         totalLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
-        totalLabel.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 8));
-        panel.add(totalLabel, BorderLayout.SOUTH);
+        totalLabel.setBorder(new EmptyBorder(4, 0, 4, 8));
 
         runBtn.addActionListener(e -> {
             model.setRowCount(0);
+
             String sql = """
                 SELECT p.item_id, p.description,
                        SUM(si.quantity) AS qty_sold,
@@ -83,6 +102,7 @@ public class ReportsPanel extends JPanel {
                 """;
 
             double grandTotal = 0;
+
             try (Connection conn = DatabaseManager.getConnection();
                  PreparedStatement stmt = conn.prepareStatement(sql)) {
 
@@ -93,6 +113,7 @@ public class ReportsPanel extends JPanel {
                 while (rs.next()) {
                     double revenue = rs.getDouble("revenue");
                     grandTotal += revenue;
+
                     model.addRow(new Object[]{
                             rs.getString("item_id"),
                             rs.getString("description"),
@@ -101,44 +122,57 @@ public class ReportsPanel extends JPanel {
                     });
                 }
 
+                totalLabel.setText("Total Revenue: £" + String.format("%.2f", grandTotal));
+
             } catch (Exception ex) {
                 ex.printStackTrace();
-                JOptionPane.showMessageDialog(panel, "Error generating report.");
+                JOptionPane.showMessageDialog(this, "Error generating turnover report.");
             }
-
-            totalLabel.setText("Total Revenue: £" + String.format("%.2f", grandTotal));
         });
 
-        return panel;
+        card.add(filterRow, BorderLayout.NORTH);
+        card.add(new JScrollPane(table), BorderLayout.CENTER);
+        card.add(totalLabel, BorderLayout.SOUTH);
+
+        outer.add(card, BorderLayout.CENTER);
+        return outer;
     }
 
-    // ----------------------------------------------------------------
-    // TAB 2 — Stock availability report
-    // ----------------------------------------------------------------
     private JPanel buildStockTab() {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JPanel outer = new JPanel(new BorderLayout());
+        outer.setOpaque(false);
 
-        JPanel topRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 6));
-        JButton refreshBtn = new JButton("Refresh");
+        JPanel card = AppShell.createCard();
+        card.setLayout(new BorderLayout(0, 18));
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(232, 232, 232)),
+                new EmptyBorder(20, 20, 20, 20)
+        ));
+
+        JPanel topRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        topRow.setOpaque(false);
+
+        JButton refreshBtn = buildDarkButton("Refresh");
         JCheckBox lowStockOnly = new JCheckBox("Show low stock only");
+        lowStockOnly.setOpaque(false);
+
         topRow.add(refreshBtn);
         topRow.add(lowStockOnly);
-        panel.add(topRow, BorderLayout.NORTH);
 
-        String[] cols = {"Item ID", "Description", "Stock Qty", "Min Level",
-                "Price £", "VAT %", "Stock Value £", "Status"};
+        String[] cols = {"Item ID", "Description", "Stock Qty", "Min Level", "Price £", "VAT %", "Stock Value £", "Status"};
         DefaultTableModel model = new DefaultTableModel(cols, 0) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
+            @Override
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
         };
+
         JTable table = new JTable(model);
-        table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
-        panel.add(new JScrollPane(table), BorderLayout.CENTER);
+        styleTable(table);
 
         JLabel totalLabel = new JLabel(" ", SwingConstants.RIGHT);
         totalLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
-        totalLabel.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 8));
-        panel.add(totalLabel, BorderLayout.SOUTH);
+        totalLabel.setBorder(new EmptyBorder(4, 0, 4, 8));
 
         Runnable load = () -> {
             model.setRowCount(0);
@@ -148,9 +182,9 @@ public class ReportsPanel extends JPanel {
 
             double totalValue = 0;
             for (Product p : products) {
-                double stockValue = p.getPrice() * p.getStockQuantity()
-                        * (1 + p.getVatRate() / 100);
+                double stockValue = p.getPrice() * p.getStockQuantity() * (1 + p.getVatRate() / 100);
                 totalValue += stockValue;
+
                 model.addRow(new Object[]{
                         p.getItemId(),
                         p.getDescription(),
@@ -162,57 +196,70 @@ public class ReportsPanel extends JPanel {
                         p.isLowStock() ? "LOW STOCK" : "OK"
                 });
             }
+
             totalLabel.setText("Total Stock Value (inc. VAT): £" + String.format("%.2f", totalValue));
         };
 
         refreshBtn.addActionListener(e -> load.run());
         lowStockOnly.addActionListener(e -> load.run());
 
-        // load on show
-        panel.addComponentListener(new java.awt.event.ComponentAdapter() {
-            @Override public void componentShown(java.awt.event.ComponentEvent e) { load.run(); }
+        outer.addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentShown(java.awt.event.ComponentEvent e) {
+                load.run();
+            }
         });
 
-        return panel;
+        card.add(topRow, BorderLayout.NORTH);
+        card.add(new JScrollPane(table), BorderLayout.CENTER);
+        card.add(totalLabel, BorderLayout.SOUTH);
+
+        outer.add(card, BorderLayout.CENTER);
+        return outer;
     }
 
-    // ----------------------------------------------------------------
-    // TAB 3 — Aggregated customer debt report
-    // as per brief: debt at start of period, payments received, debt at end
-    // ----------------------------------------------------------------
     private JPanel buildDebtTab() {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JPanel outer = new JPanel(new BorderLayout());
+        outer.setOpaque(false);
 
-        JPanel filterRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 6));
+        JPanel card = AppShell.createCard();
+        card.setLayout(new BorderLayout(0, 18));
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(232, 232, 232)),
+                new EmptyBorder(20, 20, 20, 20)
+        ));
+
+        JPanel filterRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        filterRow.setOpaque(false);
+
+        JTextField fromField = buildTextField("2024-01-01", 12);
+        JTextField toField = buildTextField("2099-12-31", 12);
+        JButton runBtn = buildDarkButton("Generate");
+
         filterRow.add(new JLabel("From (YYYY-MM-DD):"));
-        JTextField fromField = new JTextField("2024-01-01", 12);
         filterRow.add(fromField);
         filterRow.add(new JLabel("To (YYYY-MM-DD):"));
-        JTextField toField = new JTextField("2099-12-31", 12);
         filterRow.add(toField);
-        JButton runBtn = new JButton("Generate");
         filterRow.add(runBtn);
-        panel.add(filterRow, BorderLayout.NORTH);
 
-        String[] cols = {"Account No.", "Full Name", "Status",
-                "Opening Debt £", "Payments Received £", "Current Balance £"};
+        String[] cols = {"Account No.", "Full Name", "Status", "Opening Debt £", "Payments Received £", "Current Balance £"};
         DefaultTableModel model = new DefaultTableModel(cols, 0) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
+            @Override
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
         };
+
         JTable table = new JTable(model);
-        table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
-        panel.add(new JScrollPane(table), BorderLayout.CENTER);
+        styleTable(table);
 
         JLabel summaryLabel = new JLabel(" ", SwingConstants.RIGHT);
         summaryLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
-        summaryLabel.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 8));
-        panel.add(summaryLabel, BorderLayout.SOUTH);
+        summaryLabel.setBorder(new EmptyBorder(4, 0, 4, 8));
 
         runBtn.addActionListener(e -> {
             model.setRowCount(0);
 
-            // payments received in period per customer
             String paymentsSql = """
                 SELECT customer_id, SUM(amount) AS total_paid
                 FROM account_payments
@@ -220,7 +267,6 @@ public class ReportsPanel extends JPanel {
                 GROUP BY customer_id
                 """;
 
-            // invoices raised in period per customer (opening debt)
             String invoicesSql = """
                 SELECT customer_id, SUM(amount_due) AS total_invoiced
                 FROM invoices
@@ -249,17 +295,18 @@ public class ReportsPanel extends JPanel {
                 }
 
                 List<Customer> customers = CustomerDB.getAllActiveCustomers();
-                double totalOpeningDebt   = 0;
-                double totalPayments      = 0;
+
+                double totalOpeningDebt = 0;
+                double totalPayments = 0;
                 double totalCurrentBalance = 0;
 
                 for (Customer c : customers) {
-                    double opening  = openingDebt.getOrDefault(c.getCustomerId(), 0.0);
-                    double paid     = payments.getOrDefault(c.getCustomerId(), 0.0);
-                    double balance  = c.getCurrentBalance();
+                    double opening = openingDebt.getOrDefault(c.getCustomerId(), 0.0);
+                    double paid = payments.getOrDefault(c.getCustomerId(), 0.0);
+                    double balance = c.getCurrentBalance();
 
-                    totalOpeningDebt    += opening;
-                    totalPayments       += paid;
+                    totalOpeningDebt += opening;
+                    totalPayments += paid;
                     totalCurrentBalance += balance;
 
                     model.addRow(new Object[]{
@@ -280,10 +327,47 @@ public class ReportsPanel extends JPanel {
 
             } catch (Exception ex) {
                 ex.printStackTrace();
-                JOptionPane.showMessageDialog(panel, "Error generating report.");
+                JOptionPane.showMessageDialog(this, "Error generating debt report.");
             }
         });
 
-        return panel;
+        card.add(filterRow, BorderLayout.NORTH);
+        card.add(new JScrollPane(table), BorderLayout.CENTER);
+        card.add(summaryLabel, BorderLayout.SOUTH);
+
+        outer.add(card, BorderLayout.CENTER);
+        return outer;
+    }
+
+    private JTextField buildTextField(String text, int cols) {
+        JTextField field = new JTextField(text, cols);
+        field.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(220, 220, 220)),
+                new EmptyBorder(6, 10, 6, 10)
+        ));
+        return field;
+    }
+
+    private void styleTable(JTable table) {
+        table.setRowHeight(38);
+        table.setShowGrid(false);
+        table.setIntercellSpacing(new Dimension(0, 0));
+        table.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
+        table.getTableHeader().setReorderingAllowed(false);
+    }
+
+    private JButton buildDarkButton(String text) {
+        JButton btn = new JButton(text);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setContentAreaFilled(true);
+        btn.setOpaque(true);
+        btn.setBackground(new Color(30, 32, 38));
+        btn.setForeground(Color.WHITE);
+        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setBorder(new EmptyBorder(9, 16, 9, 16));
+        return btn;
     }
 }

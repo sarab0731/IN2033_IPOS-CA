@@ -2,89 +2,114 @@ package ui;
 
 import database.CustomerDB;
 import database.DatabaseManager;
-import domain.Customer;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.time.LocalDate;
-import java.util.List;
 
 public class PaymentRemindersPanel extends JPanel {
 
     private DefaultTableModel tableModel;
+    private JTable table;
 
     public PaymentRemindersPanel(ScreenRouter router) {
         setLayout(new BorderLayout());
+        setBackground(new Color(242, 242, 242));
 
-        // --- HEADER ---
-        JPanel header = new JPanel(new BorderLayout());
-        JLabel title = new JLabel("Payment Reminders", SwingConstants.CENTER);
-        title.setFont(new Font("SansSerif", Font.BOLD, 28));
-        JButton backBtn = new JButton("Back");
-        backBtn.addActionListener(e -> router.goTo(MainFrame.SCREEN_DASHBOARD));
-        header.add(backBtn, BorderLayout.WEST);
-        header.add(title, BorderLayout.CENTER);
-        add(header, BorderLayout.NORTH);
+        JPanel reminderContent = buildReminderContent();
 
-        // --- TABLE ---
-        String[] cols = {"Customer ID", "Account No.", "Full Name", "Status",
-                "Balance £", "1st Reminder", "2nd Reminder", "Invoice ID"};
-        tableModel = new DefaultTableModel(cols, 0) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
-        };
+        AppShell shell = new AppShell(
+                router,
+                MainFrame.SCREEN_REMINDERS,
+                "Payment Reminders",
+                "Track overdue balances and reminder status",
+                reminderContent
+        );
 
-        JTable table = new JTable(tableModel);
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
-        add(new JScrollPane(table), BorderLayout.CENTER);
-
-        // --- BUTTONS ---
-        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 8));
-        JButton generateBtn = new JButton("Generate Reminders");
-        generateBtn.setFont(new Font("SansSerif", Font.BOLD, 13));
-        JButton refreshBtn  = new JButton("Refresh");
-        buttons.add(generateBtn);
-        buttons.add(refreshBtn);
-        add(buttons, BorderLayout.SOUTH);
-
-        refreshBtn.addActionListener(e -> loadTable());
-
-        /*
-         * GENERATE REMINDERS — implements the pseudo-code from brief page 18 exactly:
-         *
-         * if (status_1stReminder = 'due')
-         *   generate(1st Reminder)
-         *   status_1stReminder = 'sent'
-         *   date_2ndReminder = current_date + 15 days
-         *
-         * if (status_2ndReminder = 'due')
-         *   if (date_2ndReminder <= current_date)
-         *     generate(2nd Reminder)
-         *     status_2ndReminder = 'sent'
-         */
-        generateBtn.addActionListener(e -> {
-            int generated = runReminderAlgorithm();
-            JOptionPane.showMessageDialog(this,
-                    generated == 0
-                            ? "No reminders due at this time."
-                            : generated + " reminder(s) generated.");
-            loadTable();
-        });
+        add(shell, BorderLayout.CENTER);
 
         addComponentListener(new java.awt.event.ComponentAdapter() {
-            @Override public void componentShown(java.awt.event.ComponentEvent e) {
-                // auto-update account statuses before showing
+            @Override
+            public void componentShown(java.awt.event.ComponentEvent e) {
                 updateAccountStatuses();
                 loadTable();
             }
         });
     }
 
-    // ----------------------------------------------------------------
-    // Implements reminder algorithm exactly as in brief page 18
-    // ----------------------------------------------------------------
+    private JPanel buildReminderContent() {
+        JPanel outer = new JPanel(new BorderLayout());
+        outer.setOpaque(false);
+
+        JPanel card = AppShell.createCard();
+        card.setLayout(new BorderLayout(0, 18));
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(232, 232, 232)),
+                new EmptyBorder(20, 20, 20, 20)
+        ));
+
+        JPanel top = new JPanel(new BorderLayout());
+        top.setOpaque(false);
+
+        JLabel title = new JLabel("Reminder Queue");
+        title.setFont(new Font("SansSerif", Font.BOLD, 16));
+        title.setForeground(new Color(35, 35, 35));
+
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        right.setOpaque(false);
+
+        JButton generateBtn = buildDarkButton("Generate Reminders");
+        JButton refreshBtn = buildLightButton("Refresh");
+
+        generateBtn.addActionListener(e -> {
+            int generated = runReminderAlgorithm();
+            JOptionPane.showMessageDialog(
+                    this,
+                    generated == 0 ? "No reminders due at this time." : generated + " reminder(s) generated."
+            );
+            loadTable();
+        });
+
+        refreshBtn.addActionListener(e -> {
+            updateAccountStatuses();
+            loadTable();
+        });
+
+        right.add(generateBtn);
+        right.add(refreshBtn);
+
+        top.add(title, BorderLayout.WEST);
+        top.add(right, BorderLayout.EAST);
+
+        String[] cols = {"Customer ID", "Account No.", "Full Name", "Status", "Balance £", "Reminder Type", "Reminder Status", "Invoice ID"};
+        tableModel = new DefaultTableModel(cols, 0) {
+            @Override
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
+        };
+
+        table = new JTable(tableModel);
+        styleTable(table);
+        table.getColumnModel().getColumn(3).setCellRenderer(new StatusCellRenderer());
+        table.getColumnModel().getColumn(6).setCellRenderer(new ReminderStatusCellRenderer());
+
+        JScrollPane scrollPane = new JScrollPane(table);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+
+        card.add(top, BorderLayout.NORTH);
+        card.add(scrollPane, BorderLayout.CENTER);
+
+        outer.add(card, BorderLayout.CENTER);
+        return outer;
+    }
+
     private int runReminderAlgorithm() {
         int count = 0;
         LocalDate today = LocalDate.now();
@@ -106,25 +131,18 @@ public class PaymentRemindersPanel extends JPanel {
             WHERE reminder_id = ?
             """;
 
-        String scheduleSecondSql = """
-            UPDATE payment_reminders
-            SET reminder_status = 'PENDING'
-            WHERE invoice_id = ? AND reminder_type = 'SECOND' AND reminder_status = 'PENDING'
-            """;
-
         try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement fetch  = conn.prepareStatement(fetchSql);
+             PreparedStatement fetch = conn.prepareStatement(fetchSql);
              PreparedStatement update = conn.prepareStatement(updateSql)) {
 
             ResultSet rs = fetch.executeQuery();
 
             while (rs.next()) {
-                String type   = rs.getString("reminder_type");
+                String type = rs.getString("reminder_type");
                 int reminderId = rs.getInt("reminder_id");
-                String sentAt  = rs.getString("sent_at");
+                String sentAt = rs.getString("sent_at");
 
                 if ("FIRST".equals(type)) {
-                    // status_1stReminder = 'due' → generate 1st reminder
                     showReminderDialog(
                             rs.getString("full_name"),
                             rs.getString("account_number"),
@@ -134,21 +152,14 @@ public class PaymentRemindersPanel extends JPanel {
                             today.plusDays(7).toString()
                     );
 
-                    // status_1stReminder = 'sent'
                     update.setInt(1, reminderId);
                     update.executeUpdate();
 
-                    // schedule 2nd reminder: date_2ndReminder = current_date + 15 days
-                    scheduleSecondReminder(conn, rs.getInt("invoice_id"),
-                            rs.getInt("customer_id"), today.plusDays(15));
-
+                    scheduleSecondReminder(conn, rs.getInt("invoice_id"), rs.getInt("customer_id"), today.plusDays(15));
                     count++;
 
                 } else if ("SECOND".equals(type)) {
-                    // if (date_2ndReminder <= current_date)
-                    if (sentAt == null || LocalDate.parse(sentAt.substring(0, 10))
-                            .compareTo(today) <= 0) {
-
+                    if (sentAt == null || LocalDate.parse(sentAt.substring(0, 10)).compareTo(today) <= 0) {
                         showReminderDialog(
                                 rs.getString("full_name"),
                                 rs.getString("account_number"),
@@ -158,10 +169,8 @@ public class PaymentRemindersPanel extends JPanel {
                                 today.plusDays(7).toString()
                         );
 
-                        // status_2ndReminder = 'sent'
                         update.setInt(1, reminderId);
                         update.executeUpdate();
-
                         count++;
                     }
                 }
@@ -174,9 +183,7 @@ public class PaymentRemindersPanel extends JPanel {
         return count;
     }
 
-    private void scheduleSecondReminder(Connection conn, int invoiceId,
-                                        int customerId, LocalDate scheduledDate) {
-        // check if a second reminder already exists for this invoice
+    private void scheduleSecondReminder(Connection conn, int invoiceId, int customerId, LocalDate scheduledDate) {
         String checkSql = """
             SELECT COUNT(*) FROM payment_reminders
             WHERE invoice_id = ? AND reminder_type = 'SECOND'
@@ -193,7 +200,9 @@ public class PaymentRemindersPanel extends JPanel {
             check.setInt(1, invoiceId);
             ResultSet rs = check.executeQuery();
             rs.next();
-            if (rs.getInt(1) > 0) return; // already scheduled
+            if (rs.getInt(1) > 0) {
+                return;
+            }
 
             PreparedStatement insert = conn.prepareStatement(insertSql);
             insert.setInt(1, customerId);
@@ -206,11 +215,6 @@ public class PaymentRemindersPanel extends JPanel {
         }
     }
 
-    /*
-     * Auto-updates account statuses based on time rules from brief:
-     * - 15 days after month end with unpaid balance → SUSPENDED + set 1st reminder due
-     * - 30 days after month end with unpaid balance → IN_DEFAULT + set 2nd reminder due
-     */
     private void updateAccountStatuses() {
         LocalDate today = LocalDate.now();
 
@@ -230,7 +234,7 @@ public class PaymentRemindersPanel extends JPanel {
                 LocalDate invoiceDate = LocalDate.parse(rs.getString("invoice_date").substring(0, 10));
                 long daysPast = java.time.temporal.ChronoUnit.DAYS.between(invoiceDate, today);
                 int customerId = rs.getInt("customer_id");
-                int invoiceId  = rs.getInt("invoice_id");
+                int invoiceId = rs.getInt("invoice_id");
                 String currentStatus = rs.getString("account_status");
 
                 if (daysPast >= 30 && !"IN_DEFAULT".equals(currentStatus)) {
@@ -248,12 +252,12 @@ public class PaymentRemindersPanel extends JPanel {
         }
     }
 
-    private void ensureReminderExists(Connection conn, int customerId,
-                                      int invoiceId, String type) {
+    private void ensureReminderExists(Connection conn, int customerId, int invoiceId, String type) {
         String checkSql = """
             SELECT COUNT(*) FROM payment_reminders
             WHERE invoice_id = ? AND reminder_type = ?
             """;
+
         String insertSql = """
             INSERT INTO payment_reminders (customer_id, invoice_id, reminder_type, reminder_status)
             VALUES (?, ?, ?, 'PENDING')
@@ -265,7 +269,9 @@ public class PaymentRemindersPanel extends JPanel {
             check.setString(2, type);
             ResultSet rs = check.executeQuery();
             rs.next();
-            if (rs.getInt(1) > 0) return;
+            if (rs.getInt(1) > 0) {
+                return;
+            }
 
             PreparedStatement insert = conn.prepareStatement(insertSql);
             insert.setInt(1, customerId);
@@ -280,8 +286,8 @@ public class PaymentRemindersPanel extends JPanel {
 
     private void showReminderDialog(String name, String accountNumber, String invoiceNumber,
                                     double amount, String type, String payByDate) {
-        String heading  = "FIRST".equals(type) ? "REMINDER" : "SECOND REMINDER";
-        String message  = String.format(
+        String heading = "FIRST".equals(type) ? "REMINDER" : "SECOND REMINDER";
+        String message = String.format(
                 "%s\n\nInvoice No.: %s\nAccount: %s\nClient: %s\n\n" +
                         "According to our records, we have not yet received payment of £%.2f.\n" +
                         "Please make payment by: %s\n\n" +
@@ -289,11 +295,19 @@ public class PaymentRemindersPanel extends JPanel {
                 heading, invoiceNumber, accountNumber, name, amount, payByDate
         );
 
-        JOptionPane.showMessageDialog(this, message,
-                heading + " — " + name, JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(
+                this,
+                message,
+                heading + " — " + name,
+                JOptionPane.INFORMATION_MESSAGE
+        );
     }
 
     private void loadTable() {
+        if (tableModel == null) {
+            return;
+        }
+
         tableModel.setRowCount(0);
 
         String sql = """
@@ -324,6 +338,106 @@ public class PaymentRemindersPanel extends JPanel {
 
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    private void styleTable(JTable table) {
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.setRowHeight(38);
+        table.setShowGrid(false);
+        table.setIntercellSpacing(new Dimension(0, 0));
+        table.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        table.setForeground(new Color(35, 35, 35));
+        table.setSelectionBackground(new Color(235, 235, 235));
+        table.setSelectionForeground(new Color(35, 35, 35));
+        table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
+        table.getTableHeader().setReorderingAllowed(false);
+    }
+
+    private JButton buildDarkButton(String text) {
+        JButton btn = new JButton(text);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setContentAreaFilled(true);
+        btn.setOpaque(true);
+        btn.setBackground(new Color(30, 32, 38));
+        btn.setForeground(Color.WHITE);
+        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setBorder(new EmptyBorder(9, 16, 9, 16));
+        return btn;
+    }
+
+    private JButton buildLightButton(String text) {
+        JButton btn = new JButton(text);
+        btn.setFocusPainted(false);
+        btn.setContentAreaFilled(true);
+        btn.setOpaque(true);
+        btn.setBackground(Color.WHITE);
+        btn.setForeground(new Color(45, 45, 45));
+        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(220, 220, 220)),
+                new EmptyBorder(9, 16, 9, 16)
+        ));
+        return btn;
+    }
+
+    private static class StatusCellRenderer extends DefaultTableCellRenderer {
+        @Override
+        public Component getTableCellRendererComponent(
+                JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column
+        ) {
+            JLabel label = (JLabel) super.getTableCellRendererComponent(
+                    table, value, isSelected, hasFocus, row, column
+            );
+
+            label.setHorizontalAlignment(SwingConstants.CENTER);
+            label.setFont(new Font("SansSerif", Font.BOLD, 12));
+
+            String status = value == null ? "" : value.toString();
+
+            if (!isSelected) {
+                label.setForeground(Color.BLACK);
+
+                switch (status.toUpperCase()) {
+                    case "ACTIVE" -> label.setBackground(new Color(201, 224, 98));
+                    case "SUSPENDED" -> label.setBackground(new Color(240, 205, 90));
+                    case "IN_DEFAULT" -> label.setBackground(new Color(234, 105, 90));
+                    default -> label.setBackground(Color.WHITE);
+                }
+            }
+
+            return label;
+        }
+    }
+
+    private static class ReminderStatusCellRenderer extends DefaultTableCellRenderer {
+        @Override
+        public Component getTableCellRendererComponent(
+                JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column
+        ) {
+            JLabel label = (JLabel) super.getTableCellRendererComponent(
+                    table, value, isSelected, hasFocus, row, column
+            );
+
+            label.setHorizontalAlignment(SwingConstants.CENTER);
+            label.setFont(new Font("SansSerif", Font.BOLD, 12));
+
+            String status = value == null ? "" : value.toString();
+
+            if (!isSelected) {
+                label.setForeground(Color.BLACK);
+
+                switch (status.toUpperCase()) {
+                    case "PENDING" -> label.setBackground(new Color(240, 205, 90));
+                    case "SENT" -> label.setBackground(new Color(201, 224, 98));
+                    default -> label.setBackground(Color.WHITE);
+                }
+            }
+
+            return label;
         }
     }
 }
