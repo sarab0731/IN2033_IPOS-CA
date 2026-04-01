@@ -76,11 +76,25 @@ public class AppShell extends JPanel {
         top.setLayout(new BoxLayout(top, BoxLayout.Y_AXIS));
         top.setBorder(new EmptyBorder(22, 20, 20, 20));
 
-        JLabel logo = new JLabel("<html><div style='font-size:24px; font-weight:bold;'>SWIFT</div>" +
-                "<div style='font-size:11px; letter-spacing:2px;'>SOLUTIONS</div></html>");
-        logo.setForeground(TEXT_LIGHT);
-        logo.setAlignmentX(Component.LEFT_ALIGNMENT);
-        top.add(logo);
+        JLabel logoLabel;
+
+        try {
+            ImageIcon icon = new ImageIcon(
+                    getClass().getResource("/logo.png")
+            );
+
+            Image scaled = icon.getImage().getScaledInstance(120, 40, Image.SCALE_SMOOTH);
+            logoLabel = new JLabel(new ImageIcon(scaled));
+
+        } catch (Exception e) {
+            // fallback if image not found
+            logoLabel = new JLabel("LOGO");
+            logoLabel.setForeground(TEXT_LIGHT);
+        }
+
+        logoLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        top.add(logoLabel);
         top.add(Box.createVerticalStrut(28));
 
         addNavButton(top, "Overview", MainFrame.SCREEN_DASHBOARD);
