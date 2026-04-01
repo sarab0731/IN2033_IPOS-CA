@@ -1,12 +1,13 @@
 package database;
 
+import domain.User;
+import org.mindrot.jbcrypt.BCrypt;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-
-
-import domain.User;
-import org.mindrot.jbcrypt.BCrypt;
+import java.util.ArrayList;
+import java.util.List;
 
 public class UserDB {
 
@@ -54,5 +55,29 @@ public class UserDB {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public static List<User> getActiveUsers() {
+        List<User> users = new ArrayList<>();
+        String sql = "SELECT * FROM users WHERE is_active = 1 ORDER BY full_name";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                users.add(new User(
+                        rs.getInt("user_id"),
+                        rs.getString("username"),
+                        rs.getString("full_name"),
+                        rs.getString("role")
+                ));
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return users;
     }
 }

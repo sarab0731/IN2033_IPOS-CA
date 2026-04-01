@@ -131,9 +131,6 @@ public class ProductDB {
         }
     }
 
-    /**
-     * Finds a product by its item_id (e.g. "PARA-500").
-     */
     public static Product getByItemId(String itemId) {
         String sql = "SELECT * FROM products WHERE item_id = ? AND is_active = 1";
 
@@ -142,7 +139,9 @@ public class ProductDB {
 
             stmt.setString(1, itemId);
             ResultSet rs = stmt.executeQuery();
-            if (rs.next()) return mapRow(rs);
+            if (rs.next()) {
+                return mapRow(rs);
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -150,9 +149,6 @@ public class ProductDB {
         return null;
     }
 
-    /**
-     * Finds a product by its internal product_id.
-     */
     public static Product getById(int productId) {
         String sql = "SELECT * FROM products WHERE product_id = ? AND is_active = 1";
 
@@ -161,7 +157,9 @@ public class ProductDB {
 
             stmt.setInt(1, productId);
             ResultSet rs = stmt.executeQuery();
-            if (rs.next()) return mapRow(rs);
+            if (rs.next()) {
+                return mapRow(rs);
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -169,9 +167,6 @@ public class ProductDB {
         return null;
     }
 
-    /**
-     * Searches products by keyword in description or item_id.
-     */
     public static List<Product> searchProducts(String keyword) {
         List<Product> list = new ArrayList<>();
         String sql = """
@@ -196,6 +191,44 @@ public class ProductDB {
             e.printStackTrace();
         }
         return list;
+    }
+
+    public static int getActiveProductCount() {
+        String sql = "SELECT COUNT(*) FROM products WHERE is_active = 1";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public static int getLowStockCount() {
+        String sql = """
+            SELECT COUNT(*)
+            FROM products
+            WHERE is_active = 1 AND stock_quantity <= min_stock_level
+            """;
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
     }
 
     private static Product mapRow(ResultSet rs) throws SQLException {

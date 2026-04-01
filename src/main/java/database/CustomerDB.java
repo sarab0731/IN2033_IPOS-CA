@@ -16,7 +16,9 @@ public class CustomerDB {
              PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
 
-            while (rs.next()) list.add(mapRow(rs));
+            while (rs.next()) {
+                list.add(mapRow(rs));
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -32,7 +34,9 @@ public class CustomerDB {
 
             stmt.setString(1, accountNumber);
             ResultSet rs = stmt.executeQuery();
-            if (rs.next()) return mapRow(rs);
+            if (rs.next()) {
+                return mapRow(rs);
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -56,10 +60,11 @@ public class CustomerDB {
             stmt.setString(4, c.getPhone());
             stmt.setString(5, c.getAddress());
             stmt.setDouble(6, c.getCreditLimit());
-            if (c.getDiscountPlanId() > 0)
+            if (c.getDiscountPlanId() > 0) {
                 stmt.setInt(7, c.getDiscountPlanId());
-            else
+            } else {
                 stmt.setNull(7, Types.INTEGER);
+            }
 
             stmt.executeUpdate();
             return true;
@@ -105,8 +110,8 @@ public class CustomerDB {
     }
 
     public static boolean recordAccountPayment(int customerId, int invoiceId,
-                                                   int recordedByUserId, String paymentMethod,
-                                                   double amount, String notes) {
+                                               int recordedByUserId, String paymentMethod,
+                                               double amount, String notes) {
         String sql = """
             INSERT INTO account_payments (customer_id, invoice_id, recorded_by_user_id,
                 payment_method, amount, notes)
@@ -117,10 +122,11 @@ public class CustomerDB {
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, customerId);
-            if (invoiceId > 0)
+            if (invoiceId > 0) {
                 stmt.setInt(2, invoiceId);
-            else
+            } else {
                 stmt.setNull(2, Types.INTEGER);
+            }
             stmt.setInt(3, recordedByUserId);
             stmt.setString(4, paymentMethod);
             stmt.setDouble(5, amount);
@@ -142,7 +148,9 @@ public class CustomerDB {
 
             stmt.setInt(1, customerId);
             ResultSet rs = stmt.executeQuery();
-            if (rs.next()) return mapRow(rs);
+            if (rs.next()) {
+                return mapRow(rs);
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -166,10 +174,11 @@ public class CustomerDB {
             stmt.setString(3, c.getPhone());
             stmt.setString(4, c.getAddress());
             stmt.setDouble(5, c.getCreditLimit());
-            if (c.getDiscountPlanId() > 0)
+            if (c.getDiscountPlanId() > 0) {
                 stmt.setInt(6, c.getDiscountPlanId());
-            else
+            } else {
                 stmt.setNull(6, Types.INTEGER);
+            }
             stmt.setInt(7, c.getCustomerId());
             stmt.executeUpdate();
             return true;
@@ -178,6 +187,23 @@ public class CustomerDB {
             e.printStackTrace();
             return false;
         }
+    }
+
+    public static int getActiveCustomerCount() {
+        String sql = "SELECT COUNT(*) FROM customer_accounts WHERE account_status = 'ACTIVE'";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
     }
 
     private static Customer mapRow(ResultSet rs) throws SQLException {

@@ -36,27 +36,26 @@ public class SaleDB {
         try (Connection conn = DatabaseManager.getConnection()) {
             conn.setAutoCommit(false);
 
-            // calculate totals
-            double subtotal  = 0;
+            double subtotal = 0;
             double vatAmount = 0;
 
             for (Map.Entry<Product, Integer> entry : items.entrySet()) {
-                Product p   = entry.getKey();
-                int     qty = entry.getValue();
+                Product p = entry.getKey();
+                int qty = entry.getValue();
                 double lineSubtotal = p.getPrice() * qty;
-                double lineVat      = lineSubtotal * (p.getVatRate() / 100);
-                subtotal  += lineSubtotal;
+                double lineVat = lineSubtotal * (p.getVatRate() / 100);
+                subtotal += lineSubtotal;
                 vatAmount += lineVat;
             }
 
             double totalAmount = subtotal - discountAmount + vatAmount;
 
-            // insert sale
             PreparedStatement saleStmt = conn.prepareStatement(saleSql, Statement.RETURN_GENERATED_KEYS);
-            if (customer != null)
+            if (customer != null) {
                 saleStmt.setInt(1, customer.getCustomerId());
-            else
+            } else {
                 saleStmt.setNull(1, Types.INTEGER);
+            }
 
             saleStmt.setInt(2, processedByUserId);
             saleStmt.setString(3, saleType);
@@ -68,19 +67,21 @@ public class SaleDB {
             saleStmt.executeUpdate();
 
             ResultSet keys = saleStmt.getGeneratedKeys();
-            if (!keys.next()) { conn.rollback(); return -1; }
+            if (!keys.next()) {
+                conn.rollback();
+                return -1;
+            }
             int saleId = keys.getInt(1);
 
-            // insert sale items + deduct stock
-            PreparedStatement itemStmt  = conn.prepareStatement(itemSql);
+            PreparedStatement itemStmt = conn.prepareStatement(itemSql);
             PreparedStatement stockStmt = conn.prepareStatement(stockSql);
 
             for (Map.Entry<Product, Integer> entry : items.entrySet()) {
-                Product p   = entry.getKey();
-                int     qty = entry.getValue();
+                Product p = entry.getKey();
+                int qty = entry.getValue();
                 double lineSubtotal = p.getPrice() * qty;
-                double lineVat      = lineSubtotal * (p.getVatRate() / 100);
-                double lineTotal    = lineSubtotal + lineVat;
+                double lineVat = lineSubtotal * (p.getVatRate() / 100);
+                double lineTotal = lineSubtotal + lineVat;
 
                 itemStmt.setInt(1, saleId);
                 itemStmt.setInt(2, p.getProductId());
@@ -140,13 +141,14 @@ public class SaleDB {
             stmt.setDouble(4, amountDue);
             stmt.executeUpdate();
 
-            // update customer balance
-            CustomerDB.updateBalance(customerId,
+            CustomerDB.updateBalance(
+                    customerId,
                     CustomerDB.getAllActiveCustomers().stream()
                             .filter(c -> c.getCustomerId() == customerId)
                             .findFirst()
                             .map(c -> c.getCurrentBalance() + amountDue)
-                            .orElse(amountDue));
+                            .orElse(amountDue)
+            );
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -170,7 +172,9 @@ public class SaleDB {
             stmt.setString(1, fromDate);
             stmt.setString(2, toDate);
             ResultSet rs = stmt.executeQuery();
-            if (rs.next()) return rs.getDouble("turnover");
+            if (rs.next()) {
+                return rs.getDouble("turnover");
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -223,7 +227,7 @@ public class SaleDB {
      * Returns the statement number or null on failure.
      */
     public static String generateMonthlyStatement(int customerId, String periodStart,
-                                                   String periodEnd, double totalDue) {
+                                                  String periodEnd, double totalDue) {
         String num = "STM-" + System.currentTimeMillis();
         String sql = """
             INSERT INTO monthly_statements
@@ -299,5 +303,61 @@ public class SaleDB {
             e.printStackTrace();
             return false;
         }
+    }
+
+    public static int getSalesCount() {
+        String sql = "SELECT COUNT(*) FROM sales";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public static double getTotalSalesValue() {
+        String sql = "SELECT COALESCE(SUM(total_amount), 0) FROM sales";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            if (rs.next()) {
+                return rs.getDouble(1);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public static double getSalesValueLastDays(int days) {
+        String sql = """
+            SELECT COALESCE(SUM(total_amount), 0)
+            FROM sales
+            WHERE DATE(sale_datetime) >= DATE('now', ?)
+            """;
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, "-" + days + " day");
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getDouble(1);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
     }
 }
