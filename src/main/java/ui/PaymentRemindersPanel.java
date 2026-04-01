@@ -101,7 +101,9 @@ public class PaymentRemindersPanel extends JPanel {
         table.getColumnModel().getColumn(6).setCellRenderer(new ReminderStatusCellRenderer());
 
         JScrollPane scrollPane = new JScrollPane(table);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.setBorder(BorderFactory.createLineBorder(ThemeManager.borderColor()));
+        scrollPane.getViewport().setBackground(ThemeManager.tableBackground());
+        scrollPane.setBackground(ThemeManager.tableBackground());
 
         card.add(top, BorderLayout.NORTH);
         card.add(scrollPane, BorderLayout.CENTER);
@@ -347,10 +349,14 @@ public class PaymentRemindersPanel extends JPanel {
         table.setShowGrid(false);
         table.setIntercellSpacing(new Dimension(0, 0));
         table.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        table.setForeground(new Color(35, 35, 35));
-        table.setSelectionBackground(new Color(235, 235, 235));
-        table.setSelectionForeground(new Color(35, 35, 35));
+        table.setBackground(ThemeManager.tableBackground());
+        table.setForeground(ThemeManager.textPrimary());
+        table.setSelectionBackground(ThemeManager.selectionBackground());
+        table.setSelectionForeground(ThemeManager.textPrimary());
+        table.setGridColor(ThemeManager.tableGrid());
         table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
+        table.getTableHeader().setBackground(ThemeManager.tableHeaderBackground());
+        table.getTableHeader().setForeground(ThemeManager.textPrimary());
         table.getTableHeader().setReorderingAllowed(false);
     }
 

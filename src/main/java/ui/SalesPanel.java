@@ -128,10 +128,7 @@ public class SalesPanel extends JPanel {
     private JPanel buildCataloguePanel() {
         JPanel panel = new JPanel(new BorderLayout(0, 12));
         panel.setOpaque(false);
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(235, 235, 235)),
-                new EmptyBorder(12, 12, 12, 12)
-        ));
+        applyPanelTheme(panel);
         panel.setBackground(Color.WHITE);
 
         JLabel title = new JLabel("Available Products");
@@ -155,8 +152,7 @@ public class SalesPanel extends JPanel {
         productTable.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
         productTable.getTableHeader().setReorderingAllowed(false);
 
-        JScrollPane scrollPane = new JScrollPane(productTable);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        JScrollPane scrollPane = themedScrollPane(productTable);
 
         panel.add(title, BorderLayout.NORTH);
         panel.add(scrollPane, BorderLayout.CENTER);
@@ -319,7 +315,7 @@ public class SalesPanel extends JPanel {
         btn.setBorderPainted(false);
         btn.setContentAreaFilled(true);
         btn.setOpaque(true);
-        btn.setBackground(new Color(30, 32, 38));
+        btn.setBackground(ThemeManager.buttonDark());
         btn.setForeground(Color.WHITE);
         btn.setFont(new Font("SansSerif", Font.BOLD, 12));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -332,8 +328,8 @@ public class SalesPanel extends JPanel {
         btn.setFocusPainted(false);
         btn.setContentAreaFilled(true);
         btn.setOpaque(true);
-        btn.setBackground(Color.WHITE);
-        btn.setForeground(new Color(45, 45, 45));
+        btn.setBackground(ThemeManager.buttonLight());
+        btn.setForeground(ThemeManager.textPrimary());
         btn.setFont(new Font("SansSerif", Font.BOLD, 12));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btn.setBorder(BorderFactory.createCompoundBorder(
@@ -543,5 +539,40 @@ public class SalesPanel extends JPanel {
 
         loadCatalogue();
         clearCart();
+    }
+
+    private void applyPanelTheme(JComponent c) {
+        c.setBackground(ThemeManager.innerCardBackground());
+        c.setForeground(ThemeManager.textPrimary());
+        c.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(ThemeManager.borderColor()),
+                new EmptyBorder(12, 12, 12, 12)
+        ));
+    }
+
+    private void styleTable(JTable table) {
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.setRowHeight(38);
+        table.setShowGrid(false);
+        table.setIntercellSpacing(new Dimension(0, 0));
+        table.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        table.setBackground(ThemeManager.tableBackground());
+        table.setForeground(ThemeManager.textPrimary());
+        table.setSelectionBackground(ThemeManager.selectionBackground());
+        table.setSelectionForeground(ThemeManager.textPrimary());
+        table.setGridColor(ThemeManager.tableGrid());
+
+        table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
+        table.getTableHeader().setBackground(ThemeManager.tableHeaderBackground());
+        table.getTableHeader().setForeground(ThemeManager.textPrimary());
+        table.getTableHeader().setReorderingAllowed(false);
+    }
+
+    private JScrollPane themedScrollPane(JTable table) {
+        JScrollPane scrollPane = new JScrollPane(table);
+        scrollPane.setBorder(BorderFactory.createLineBorder(ThemeManager.borderColor()));
+        scrollPane.getViewport().setBackground(ThemeManager.tableBackground());
+        scrollPane.setBackground(ThemeManager.tableBackground());
+        return scrollPane;
     }
 }

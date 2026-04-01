@@ -9,51 +9,47 @@ import java.awt.*;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-public class AppShell extends JPanel {
+public class AppShell extends JPanel implements ThemeManager.ThemeListener {
 
     private final ScreenRouter router;
     private final String activeScreen;
 
-    private final JPanel sidebar;
-    private final JPanel pageContent;
+    private JPanel sidebar;
+    private JPanel mainArea;
+    private JPanel pageContent;
+    private JPanel topBar;
+
     private JLabel welcomeLabel;
     private JLabel roleLabel;
+    private JTextField searchField;
+    private JLabel userNameLabel;
+    private JLabel logoLabel;
 
     private final Map<String, JButton> navButtons = new LinkedHashMap<>();
-
-    private static final Color BG = new Color(242, 242, 242);
-    private static final Color SIDEBAR = new Color(28, 30, 35);
-    private static final Color SIDEBAR_HOVER = new Color(44, 47, 54);
-    private static final Color SIDEBAR_ACTIVE = new Color(56, 60, 68);
-    private static final Color TEXT_LIGHT = new Color(245, 245, 245);
-    private static final Color TEXT_MUTED = new Color(165, 170, 176);
-    private static final Color CARD = new Color(255, 255, 255);
-    private static final Color BORDER = new Color(225, 225, 225);
-    private static final Color TEXT_DARK = new Color(40, 40, 40);
 
     public AppShell(ScreenRouter router, String activeScreen, String heading, String subheading, JComponent content) {
         this.router = router;
         this.activeScreen = activeScreen;
 
         setLayout(new BorderLayout());
-        setBackground(BG);
 
         sidebar = buildSidebar();
         add(sidebar, BorderLayout.WEST);
 
-        JPanel mainArea = new JPanel(new BorderLayout());
-        mainArea.setBackground(BG);
+        mainArea = new JPanel(new BorderLayout());
 
-        JPanel topBar = buildTopBar(heading, subheading);
+        topBar = buildTopBar(heading, subheading);
         mainArea.add(topBar, BorderLayout.NORTH);
 
         pageContent = new JPanel(new BorderLayout());
-        pageContent.setBackground(BG);
         pageContent.setBorder(new EmptyBorder(18, 18, 18, 18));
         pageContent.add(content, BorderLayout.CENTER);
 
         mainArea.add(pageContent, BorderLayout.CENTER);
         add(mainArea, BorderLayout.CENTER);
+
+        ThemeManager.register(this);
+        applyTheme();
 
         addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
@@ -68,7 +64,6 @@ public class AppShell extends JPanel {
     private JPanel buildSidebar() {
         JPanel panel = new JPanel();
         panel.setPreferredSize(new Dimension(180, 0));
-        panel.setBackground(SIDEBAR);
         panel.setLayout(new BorderLayout());
 
         JPanel top = new JPanel();
@@ -76,22 +71,8 @@ public class AppShell extends JPanel {
         top.setLayout(new BoxLayout(top, BoxLayout.Y_AXIS));
         top.setBorder(new EmptyBorder(22, 20, 20, 20));
 
-        JLabel logoLabel;
-
-        try {
-            ImageIcon icon = new ImageIcon(
-                    getClass().getResource("/logo.png")
-            );
-
-            Image scaled = icon.getImage().getScaledInstance(120, 40, Image.SCALE_SMOOTH);
-            logoLabel = new JLabel(new ImageIcon(scaled));
-
-        } catch (Exception e) {
-            // fallback if image not found
-            logoLabel = new JLabel("LOGO");
-            logoLabel.setForeground(TEXT_LIGHT);
-        }
-
+        logoLabel = new JLabel();
+        setLogo();
         logoLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         top.add(logoLabel);
@@ -113,12 +94,10 @@ public class AppShell extends JPanel {
         bottom.setBorder(new EmptyBorder(10, 20, 20, 20));
 
         JLabel help = new JLabel("Help");
-        help.setForeground(TEXT_MUTED);
-        help.setAlignmentX(Component.LEFT_ALIGNMENT);
-
         JLabel contact = new JLabel("Contact us");
-        contact.setForeground(TEXT_MUTED);
-        contact.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JButton toggleThemeBtn = createNavButton("Toggle Theme");
+        toggleThemeBtn.addActionListener(e -> ThemeManager.toggleTheme());
 
         JButton logoutBtn = createNavButton("Log out");
         logoutBtn.addActionListener(e -> {
@@ -126,22 +105,28 @@ public class AppShell extends JPanel {
             router.goTo(MainFrame.SCREEN_LOGIN);
         });
 
+        help.setAlignmentX(Component.LEFT_ALIGNMENT);
+        contact.setAlignmentX(Component.LEFT_ALIGNMENT);
+
         bottom.add(help);
         bottom.add(Box.createVerticalStrut(14));
         bottom.add(contact);
         bottom.add(Box.createVerticalStrut(18));
+        bottom.add(toggleThemeBtn);
+        bottom.add(Box.createVerticalStrut(10));
         bottom.add(logoutBtn);
 
-        panel.add(bottom, BorderLayout.SOUTH);
+        panel.putClientProperty("helpLabel", help);
+        panel.putClientProperty("contactLabel", contact);
 
+        panel.add(bottom, BorderLayout.SOUTH);
         return panel;
     }
 
     private JPanel buildTopBar(String heading, String subheading) {
         JPanel top = new JPanel(new BorderLayout());
-        top.setBackground(new Color(250, 250, 250));
         top.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER),
+                BorderFactory.createMatteBorder(0, 0, 1, 0, ThemeManager.borderColor()),
                 new EmptyBorder(24, 28, 24, 28)
         ));
 
@@ -151,11 +136,9 @@ public class AppShell extends JPanel {
 
         welcomeLabel = new JLabel(heading);
         welcomeLabel.setFont(new Font("SansSerif", Font.BOLD, 22));
-        welcomeLabel.setForeground(TEXT_DARK);
 
         roleLabel = new JLabel(subheading);
         roleLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
-        roleLabel.setForeground(new Color(120, 120, 120));
 
         left.add(welcomeLabel);
         left.add(Box.createVerticalStrut(8));
@@ -164,30 +147,26 @@ public class AppShell extends JPanel {
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 0));
         right.setOpaque(false);
 
-        JTextField search = new JTextField("Search", 12);
-        search.setPreferredSize(new Dimension(150, 36));
-        search.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(225, 225, 225)),
+        searchField = new JTextField("Search", 12);
+        searchField.setPreferredSize(new Dimension(150, 36));
+        searchField.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(ThemeManager.borderColor()),
                 new EmptyBorder(6, 12, 6, 12)
         ));
-        search.setBackground(new Color(245, 245, 245));
-        search.setForeground(new Color(130, 130, 130));
 
-        JLabel bell = new JLabel("\uD83D\uDD14");
+        JLabel bell = new JLabel("🔔");
         bell.setFont(new Font("SansSerif", Font.PLAIN, 16));
 
-        JLabel avatar = new JLabel("\u25CF");
+        JLabel avatar = new JLabel("●");
         avatar.setFont(new Font("SansSerif", Font.BOLD, 18));
-        avatar.setForeground(new Color(110, 110, 110));
 
-        JLabel userName = new JLabel("Username");
-        userName.setForeground(TEXT_DARK);
-        userName.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        userNameLabel = new JLabel("Username");
+        userNameLabel.setFont(new Font("SansSerif", Font.PLAIN, 13));
 
-        right.add(search);
+        right.add(searchField);
         right.add(bell);
         right.add(avatar);
-        right.add(userName);
+        right.add(userNameLabel);
 
         top.add(left, BorderLayout.WEST);
         top.add(right, BorderLayout.EAST);
@@ -213,8 +192,6 @@ public class AppShell extends JPanel {
         btn.setBorderPainted(false);
         btn.setContentAreaFilled(true);
         btn.setOpaque(true);
-        btn.setBackground(SIDEBAR);
-        btn.setForeground(TEXT_MUTED);
         btn.setFont(new Font("SansSerif", Font.BOLD, 14));
         btn.setBorder(new EmptyBorder(10, 14, 10, 14));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -222,17 +199,17 @@ public class AppShell extends JPanel {
         btn.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseEntered(java.awt.event.MouseEvent e) {
-                if (btn.getBackground() != SIDEBAR_ACTIVE) {
-                    btn.setBackground(SIDEBAR_HOVER);
-                    btn.setForeground(TEXT_LIGHT);
+                if (!btn.getBackground().equals(ThemeManager.sidebarActive())) {
+                    btn.setBackground(ThemeManager.sidebarHover());
+                    btn.setForeground(ThemeManager.textLight());
                 }
             }
 
             @Override
             public void mouseExited(java.awt.event.MouseEvent e) {
-                if (btn.getBackground() != SIDEBAR_ACTIVE) {
-                    btn.setBackground(SIDEBAR);
-                    btn.setForeground(TEXT_MUTED);
+                if (!btn.getBackground().equals(ThemeManager.sidebarActive())) {
+                    btn.setBackground(ThemeManager.sidebarBackground());
+                    btn.setForeground(ThemeManager.textSecondary());
                 }
             }
         });
@@ -244,11 +221,11 @@ public class AppShell extends JPanel {
         for (Map.Entry<String, JButton> entry : navButtons.entrySet()) {
             JButton btn = entry.getValue();
             if (entry.getKey().equals(activeScreen)) {
-                btn.setBackground(SIDEBAR_ACTIVE);
-                btn.setForeground(TEXT_LIGHT);
+                btn.setBackground(ThemeManager.sidebarActive());
+                btn.setForeground(ThemeManager.textLight());
             } else {
-                btn.setBackground(SIDEBAR);
-                btn.setForeground(TEXT_MUTED);
+                btn.setBackground(ThemeManager.sidebarBackground());
+                btn.setForeground(ThemeManager.textSecondary());
             }
         }
     }
@@ -259,11 +236,17 @@ public class AppShell extends JPanel {
             return;
         }
 
-        if (activeScreen.equals(MainFrame.SCREEN_DASHBOARD)) {
+        if (welcomeLabel != null && activeScreen.equals(MainFrame.SCREEN_DASHBOARD)) {
             welcomeLabel.setText("Welcome back, " + user.getFullName());
         }
 
-        roleLabel.setText(user.getRole());
+        if (roleLabel != null) {
+            roleLabel.setText(user.getRole());
+        }
+
+        if (userNameLabel != null) {
+            userNameLabel.setText(user.getUsername());
+        }
     }
 
     private void updateNavVisibility() {
@@ -291,11 +274,85 @@ public class AppShell extends JPanel {
         }
     }
 
+    private void setLogo() {
+        try {
+            ImageIcon icon = new ImageIcon(getClass().getResource("/logo.png"));
+            Image scaled = icon.getImage().getScaledInstance(120, 40, Image.SCALE_SMOOTH);
+            logoLabel.setIcon(new ImageIcon(scaled));
+            logoLabel.setText("");
+        } catch (Exception e) {
+            logoLabel.setIcon(null);
+            logoLabel.setText("LOGO");
+            logoLabel.setForeground(ThemeManager.textLight());
+        }
+    }
+
+    @Override
+    public void applyTheme() {
+        setBackground(ThemeManager.appBackground());
+
+        if (sidebar != null) {
+            sidebar.setBackground(ThemeManager.sidebarBackground());
+            JLabel help = (JLabel) sidebar.getClientProperty("helpLabel");
+            JLabel contact = (JLabel) sidebar.getClientProperty("contactLabel");
+            if (help != null) {
+                help.setForeground(ThemeManager.textSecondary());
+            }
+            if (contact != null) {
+                contact.setForeground(ThemeManager.textSecondary());
+            }
+        }
+
+        if (mainArea != null) {
+            mainArea.setBackground(ThemeManager.appBackground());
+        }
+
+        if (pageContent != null) {
+            pageContent.setBackground(ThemeManager.appBackground());
+        }
+
+        if (topBar != null) {
+            topBar.setBackground(ThemeManager.topbarBackground());
+            topBar.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createMatteBorder(0, 0, 1, 0, ThemeManager.borderColor()),
+                    new EmptyBorder(24, 28, 24, 28)
+            ));
+        }
+
+        if (welcomeLabel != null) {
+            welcomeLabel.setForeground(ThemeManager.textPrimary());
+        }
+
+        if (roleLabel != null) {
+            roleLabel.setForeground(ThemeManager.textSecondary());
+        }
+
+        if (searchField != null) {
+            searchField.setBackground(ThemeManager.searchBackground());
+            searchField.setForeground(ThemeManager.textPrimary());
+            searchField.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(ThemeManager.borderColor()),
+                    new EmptyBorder(6, 12, 6, 12)
+            ));
+        }
+
+        if (userNameLabel != null) {
+            userNameLabel.setForeground(ThemeManager.textPrimary());
+        }
+
+        setLogo();
+        highlightActiveButton();
+
+        SwingUtilities.updateComponentTreeUI(this);
+        repaint();
+        revalidate();
+    }
+
     public static JPanel createCard() {
         JPanel panel = new JPanel();
-        panel.setBackground(CARD);
+        panel.setBackground(ThemeManager.panelBackground());
         panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(232, 232, 232)),
+                BorderFactory.createLineBorder(ThemeManager.borderColor()),
                 new EmptyBorder(18, 18, 18, 18)
         ));
         return panel;

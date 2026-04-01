@@ -14,7 +14,7 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.List;
 
-public class DashboardPanel extends JPanel {
+public class DashboardPanel extends JPanel implements ThemeManager.ThemeListener {
 
     private JLabel salesTitleValue;
     private JLabel salesSubtitleValue;
@@ -32,9 +32,18 @@ public class DashboardPanel extends JPanel {
     private DefaultTableModel orderTableModel;
     private DefaultTableModel staffTableModel;
 
+    private JPanel orderStatusPanel;
+    private JPanel staffPanel;
+    private JTable orderTable;
+    private JTable staffTable;
+    private JScrollPane orderScrollPane;
+    private JScrollPane staffScrollPane;
+    private JLabel orderStatusTitle;
+    private JLabel staffTitle;
+
     public DashboardPanel(ScreenRouter router) {
         setLayout(new BorderLayout());
-        setBackground(new Color(242, 242, 242));
+        setBackground(ThemeManager.appBackground());
 
         JPanel dashboardContent = buildDashboardContent(router);
 
@@ -47,6 +56,9 @@ public class DashboardPanel extends JPanel {
         );
 
         add(shell, BorderLayout.CENTER);
+
+        ThemeManager.register(this);
+        applyTheme();
 
         addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
@@ -100,41 +112,41 @@ public class DashboardPanel extends JPanel {
     }
 
     private JPanel createCustomersCard(ScreenRouter router) {
-        JPanel card = createInteractiveCard(false, () -> router.goTo(MainFrame.SCREEN_CUSTOMERS));
+        JPanel card = createInteractiveCard(true, () -> router.goTo(MainFrame.SCREEN_CUSTOMERS));
 
         customersTitleValue = new JLabel("0");
         customersSubtitleValue = new JLabel("Active customers");
         customersBottom1 = new JLabel("Live");
         customersBottom2 = new JLabel("from database");
 
-        configureMainValue(customersTitleValue, false);
-        configureSubtitle(customersSubtitleValue, false);
-        configureBottomStrong(customersBottom1, false);
-        configureBottomMuted(customersBottom2, false);
+        configureMainValue(customersTitleValue, true);
+        configureSubtitle(customersSubtitleValue, true);
+        configureBottomStrong(customersBottom1, true);
+        configureBottomMuted(customersBottom2, true);
 
-        populateCard(card, "Customers", customersSubtitleValue, customersTitleValue, customersBottom1, customersBottom2, false);
+        populateCard(card, "Customers", customersSubtitleValue, customersTitleValue, customersBottom1, customersBottom2, true);
         return card;
     }
 
     private JPanel createStockCard(ScreenRouter router) {
-        JPanel card = createInteractiveCard(false, () -> router.goTo(MainFrame.SCREEN_STOCK));
+        JPanel card = createInteractiveCard(true, () -> router.goTo(MainFrame.SCREEN_STOCK));
 
         stockTitleValue = new JLabel("0");
         stockSubtitleValue = new JLabel("0 Low Stock");
 
-        configureMainValue(stockTitleValue, false);
-        configureSubtitle(stockSubtitleValue, false);
+        configureMainValue(stockTitleValue, true);
+        configureSubtitle(stockSubtitleValue, true);
 
         JLabel empty1 = new JLabel("");
         JLabel empty2 = new JLabel("");
 
-        populateCard(card, "Stock", stockSubtitleValue, stockTitleValue, empty1, empty2, false);
+        populateCard(card, "Stock", stockSubtitleValue, stockTitleValue, empty1, empty2, true);
         return card;
     }
 
     private JPanel createInteractiveCard(boolean dark, Runnable onClick) {
-        Color normalBg = dark ? new Color(30, 32, 38) : Color.WHITE;
-        Color hoverBg = dark ? new Color(42, 45, 52) : new Color(245, 245, 245);
+        Color normalBg = dark ? new Color(30, 32, 38) : ThemeManager.panelBackground();
+        Color hoverBg = dark ? new Color(42, 45, 52) : ThemeManager.innerCardBackground();
 
         JPanel card = AppShell.createCard();
         card.setLayout(new BorderLayout(0, 12));
@@ -148,7 +160,7 @@ public class DashboardPanel extends JPanel {
 
     private void populateCard(JPanel card, String title, JLabel subtitleLabel, JLabel valueLabel,
                               JLabel bottom1, JLabel bottom2, boolean dark) {
-        Color fg = dark ? Color.WHITE : new Color(35, 35, 35);
+        Color fg = dark ? Color.WHITE : ThemeManager.textPrimary();
 
         JPanel top = new JPanel(new BorderLayout());
         top.setOpaque(false);
@@ -182,22 +194,22 @@ public class DashboardPanel extends JPanel {
     }
 
     private void configureMainValue(JLabel label, boolean dark) {
-        label.setForeground(dark ? Color.WHITE : new Color(35, 35, 35));
+        label.setForeground(dark ? Color.WHITE : ThemeManager.textPrimary());
         label.setFont(new Font("SansSerif", Font.BOLD, 20));
     }
 
     private void configureSubtitle(JLabel label, boolean dark) {
-        label.setForeground(dark ? new Color(180, 180, 180) : new Color(130, 130, 130));
+        label.setForeground(dark ? new Color(180, 180, 180) : ThemeManager.textSecondary());
         label.setFont(new Font("SansSerif", Font.PLAIN, 13));
     }
 
     private void configureBottomStrong(JLabel label, boolean dark) {
-        label.setForeground(dark ? Color.WHITE : new Color(35, 35, 35));
+        label.setForeground(dark ? Color.WHITE : ThemeManager.textPrimary());
         label.setFont(new Font("SansSerif", Font.BOLD, 13));
     }
 
     private void configureBottomMuted(JLabel label, boolean dark) {
-        label.setForeground(dark ? new Color(180, 180, 180) : new Color(130, 130, 130));
+        label.setForeground(dark ? new Color(180, 180, 180) : ThemeManager.textSecondary());
         label.setFont(new Font("SansSerif", Font.BOLD, 13));
     }
 
@@ -247,16 +259,15 @@ public class DashboardPanel extends JPanel {
     }
 
     private JPanel buildOrderStatusPanel() {
-        JPanel panel = AppShell.createCard();
-        panel.setLayout(new BorderLayout(12, 12));
+        orderStatusPanel = AppShell.createCard();
+        orderStatusPanel.setLayout(new BorderLayout(12, 12));
 
-        JLabel title = new JLabel("Order Status");
-        title.setFont(new Font("SansSerif", Font.BOLD, 16));
-        title.setForeground(new Color(45, 45, 45));
+        orderStatusTitle = new JLabel("Order Status");
+        orderStatusTitle.setFont(new Font("SansSerif", Font.BOLD, 16));
 
         JPanel top = new JPanel(new BorderLayout());
         top.setOpaque(false);
-        top.add(title, BorderLayout.WEST);
+        top.add(orderStatusTitle, BorderLayout.WEST);
 
         String[] columns = {"Order Number", "Merchant", "Status", "Total £", "Created At"};
         orderTableModel = new DefaultTableModel(columns, 0) {
@@ -266,27 +277,24 @@ public class DashboardPanel extends JPanel {
             }
         };
 
-        JTable table = new JTable(orderTableModel);
-        table.setRowHeight(36);
-        table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
-        table.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        orderTable = new JTable(orderTableModel);
+        styleTable(orderTable);
 
-        JScrollPane scrollPane = new JScrollPane(table);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        orderScrollPane = new JScrollPane(orderTable);
+        styleScrollPane(orderScrollPane);
 
-        panel.add(top, BorderLayout.NORTH);
-        panel.add(scrollPane, BorderLayout.CENTER);
+        orderStatusPanel.add(top, BorderLayout.NORTH);
+        orderStatusPanel.add(orderScrollPane, BorderLayout.CENTER);
 
-        return panel;
+        return orderStatusPanel;
     }
 
     private JPanel buildStaffPanel() {
-        JPanel panel = AppShell.createCard();
-        panel.setLayout(new BorderLayout(12, 12));
+        staffPanel = AppShell.createCard();
+        staffPanel.setLayout(new BorderLayout(12, 12));
 
-        JLabel title = new JLabel("Staff Accounts");
-        title.setFont(new Font("SansSerif", Font.BOLD, 16));
-        title.setForeground(new Color(45, 45, 45));
+        staffTitle = new JLabel("Staff Accounts");
+        staffTitle.setFont(new Font("SansSerif", Font.BOLD, 16));
 
         String[] columns = {"Name", "Role"};
         staffTableModel = new DefaultTableModel(columns, 0) {
@@ -296,17 +304,38 @@ public class DashboardPanel extends JPanel {
             }
         };
 
-        JTable table = new JTable(staffTableModel);
+        staffTable = new JTable(staffTableModel);
+        styleTable(staffTable);
+
+        staffScrollPane = new JScrollPane(staffTable);
+        styleScrollPane(staffScrollPane);
+
+        staffPanel.add(staffTitle, BorderLayout.NORTH);
+        staffPanel.add(staffScrollPane, BorderLayout.CENTER);
+
+        return staffPanel;
+    }
+
+    private void styleTable(JTable table) {
         table.setRowHeight(36);
+        table.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        table.setBackground(ThemeManager.tableBackground());
+        table.setForeground(ThemeManager.textPrimary());
+        table.setSelectionBackground(ThemeManager.selectionBackground());
+        table.setSelectionForeground(ThemeManager.textPrimary());
+        table.setGridColor(ThemeManager.tableGrid());
+        table.setFillsViewportHeight(true);
         table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
+        table.getTableHeader().setBackground(ThemeManager.tableHeaderBackground());
+        table.getTableHeader().setForeground(ThemeManager.textPrimary());
+    }
 
-        JScrollPane scrollPane = new JScrollPane(table);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-
-        panel.add(title, BorderLayout.NORTH);
-        panel.add(scrollPane, BorderLayout.CENTER);
-
-        return panel;
+    private void styleScrollPane(JScrollPane scrollPane) {
+        scrollPane.setBorder(BorderFactory.createLineBorder(ThemeManager.borderColor()));
+        scrollPane.getViewport().setBackground(ThemeManager.tableBackground());
+        scrollPane.setBackground(ThemeManager.tableBackground());
+        scrollPane.getVerticalScrollBar().setBackground(ThemeManager.panelBackground());
+        scrollPane.getHorizontalScrollBar().setBackground(ThemeManager.panelBackground());
     }
 
     private void loadDashboardData() {
@@ -368,5 +397,45 @@ public class DashboardPanel extends JPanel {
                     user.getRole()
             });
         }
+    }
+
+    @Override
+    public void applyTheme() {
+        setBackground(ThemeManager.appBackground());
+
+        if (orderStatusPanel != null) {
+            orderStatusPanel.setBackground(ThemeManager.panelBackground());
+        }
+
+        if (staffPanel != null) {
+            staffPanel.setBackground(ThemeManager.panelBackground());
+        }
+
+        if (orderStatusTitle != null) {
+            orderStatusTitle.setForeground(ThemeManager.textPrimary());
+        }
+
+        if (staffTitle != null) {
+            staffTitle.setForeground(ThemeManager.textPrimary());
+        }
+
+        if (orderTable != null) {
+            styleTable(orderTable);
+        }
+
+        if (staffTable != null) {
+            styleTable(staffTable);
+        }
+
+        if (orderScrollPane != null) {
+            styleScrollPane(orderScrollPane);
+        }
+
+        if (staffScrollPane != null) {
+            styleScrollPane(staffScrollPane);
+        }
+
+        repaint();
+        revalidate();
     }
 }
