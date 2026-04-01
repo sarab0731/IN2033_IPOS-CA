@@ -6,6 +6,8 @@ import domain.User;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 public class DashboardPanel extends JPanel {
 
@@ -51,23 +53,59 @@ public class DashboardPanel extends JPanel {
         JPanel cards = new JPanel(new GridLayout(1, 3, 18, 18));
         cards.setOpaque(false);
 
-        cards.add(createStatCard("Total Sales", "731 Orders", "£9,328.55", "+15.6%", "+1.4k this week", true));
-        cards.add(createStatCard("Customers", "Avg. time: 4:30m", "12,302", "+12.7%", "+1.2k this week", false));
-        cards.add(createStatCard("Stock", "2 Low Stock", "963", "", "", false));
+        cards.add(createStatCard(
+                "Total Sales",
+                "731 Orders",
+                "£9,328.55",
+                "+15.6%",
+                "+1.4k this week",
+                true,
+                () -> router.goTo(MainFrame.SCREEN_SALES)
+        ));
+
+        cards.add(createStatCard(
+                "Customers",
+                "Avg. time: 4:30m",
+                "12,302",
+                "+12.7%",
+                "+1.2k this week",
+                false,
+                () -> router.goTo(MainFrame.SCREEN_CUSTOMERS)
+        ));
+
+        cards.add(createStatCard(
+                "Stock",
+                "2 Low Stock",
+                "963",
+                "",
+                "",
+                false,
+                () -> router.goTo(MainFrame.SCREEN_STOCK)
+        ));
 
         return cards;
     }
 
-    private JPanel createStatCard(String title, String subtitle, String value, String stat1, String stat2, boolean dark) {
+    private JPanel createStatCard(
+            String title,
+            String subtitle,
+            String value,
+            String stat1,
+            String stat2,
+            boolean dark,
+            Runnable onClick
+    ) {
+        Color normalBg = dark ? new Color(30, 32, 38) : Color.WHITE;
+        Color hoverBg = dark ? new Color(42, 45, 52) : new Color(245, 245, 245);
+
         JPanel card = AppShell.createCard();
         card.setLayout(new BorderLayout(0, 12));
         card.setPreferredSize(new Dimension(200, 150));
+        card.setBackground(normalBg);
+        card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-        Color bg = dark ? new Color(30, 32, 38) : Color.WHITE;
         Color fg = dark ? Color.WHITE : new Color(35, 35, 35);
         Color sub = dark ? new Color(180, 180, 180) : new Color(130, 130, 130);
-
-        card.setBackground(bg);
 
         JPanel top = new JPanel(new BorderLayout());
         top.setOpaque(false);
@@ -119,7 +157,44 @@ public class DashboardPanel extends JPanel {
         card.add(valueLabel, BorderLayout.CENTER);
         card.add(bottom, BorderLayout.SOUTH);
 
+        addCardInteraction(card, normalBg, hoverBg, onClick);
+
         return card;
+    }
+
+    private void addCardInteraction(JPanel card, Color normalBg, Color hoverBg, Runnable onClick) {
+        MouseAdapter adapter = new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                card.setBackground(hoverBg);
+                card.repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                card.setBackground(normalBg);
+                card.repaint();
+            }
+
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (onClick != null) {
+                    onClick.run();
+                }
+            }
+        };
+
+        card.addMouseListener(adapter);
+
+        for (Component component : card.getComponents()) {
+            component.addMouseListener(adapter);
+
+            if (component instanceof Container container) {
+                for (Component child : container.getComponents()) {
+                    child.addMouseListener(adapter);
+                }
+            }
+        }
     }
 
     private JPanel buildBottomSection() {
