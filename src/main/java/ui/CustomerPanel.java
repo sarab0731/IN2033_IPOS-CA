@@ -34,7 +34,7 @@ public class CustomerPanel extends JPanel {
         AppShell shell = new AppShell(
                 router,
                 MainFrame.SCREEN_CUSTOMERS,
-                "Product Information",
+                "Customer Information",
                 "Manage customer accounts",
                 customerContent
         );

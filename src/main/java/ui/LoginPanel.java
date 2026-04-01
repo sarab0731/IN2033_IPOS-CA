@@ -23,6 +23,10 @@ public class LoginPanel extends JPanel {
     private final Color BUTTON_HOVER = new Color(60, 60, 60);
     private final Color ERROR_RED = new Color(180, 50, 50);
 
+    private PlaceholderTextField usernameField;
+    private JPasswordField passwordField;
+    private JLabel msgLabel;
+
     public LoginPanel(ScreenRouter router) {
         setBackground(PAGE_BG);
         setLayout(new GridBagLayout());
@@ -36,7 +40,6 @@ public class LoginPanel extends JPanel {
         c.gridx = 0;
         c.weightx = 1.0;
         c.fill = GridBagConstraints.HORIZONTAL;
-        c.insets = new Insets(0, 0, 0, 0);
 
         JLabel titleLabel = new JLabel("Sign in");
         titleLabel.setFont(new Font("SansSerif", Font.BOLD, 24));
@@ -56,13 +59,13 @@ public class LoginPanel extends JPanel {
         passwordLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
         passwordLabel.setForeground(TEXT_MID);
 
-        PlaceholderTextField usernameField = new PlaceholderTextField("Username", 20);
+        usernameField = new PlaceholderTextField("Username", 20);
         usernameField.setFont(new Font("SansSerif", Font.BOLD, 16));
         usernameField.setForeground(TEXT_DARK);
         usernameField.setBorder(null);
         usernameField.setOpaque(false);
 
-        JPasswordField passwordField = new JPasswordField(20);
+        passwordField = new JPasswordField(20);
         passwordField.setFont(new Font("SansSerif", Font.BOLD, 16));
         passwordField.setForeground(TEXT_DARK);
         passwordField.setBorder(null);
@@ -103,7 +106,7 @@ public class LoginPanel extends JPanel {
             }
         });
 
-        JLabel msgLabel = new JLabel(" ");
+        msgLabel = new JLabel(" ");
         msgLabel.setFont(new Font("SansSerif", Font.PLAIN, 13));
         msgLabel.setForeground(ERROR_RED);
 
@@ -181,6 +184,25 @@ public class LoginPanel extends JPanel {
                 );
             }
         });
+
+        addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentShown(java.awt.event.ComponentEvent e) {
+                clearFields();
+            }
+        });
+    }
+
+    public void clearFields() {
+        if (usernameField != null) {
+            usernameField.resetPlaceholder();
+        }
+        if (passwordField != null) {
+            passwordField.setText("");
+        }
+        if (msgLabel != null) {
+            msgLabel.setText(" ");
+        }
     }
 
     private JPanel createInputWrapper(String iconText, JTextField field, JButton trailingButton) {
@@ -356,6 +378,10 @@ public class LoginPanel extends JPanel {
             setText(placeholder);
             setForeground(new Color(90, 90, 90));
             showingPlaceholder = true;
+        }
+
+        public void resetPlaceholder() {
+            showPlaceholder();
         }
 
         public String getRealText() {

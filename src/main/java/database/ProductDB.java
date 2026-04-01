@@ -212,10 +212,10 @@ public class ProductDB {
 
     public static int getLowStockCount() {
         String sql = """
-            SELECT COUNT(*)
-            FROM products
-            WHERE is_active = 1 AND stock_quantity <= min_stock_level
-            """;
+        SELECT COUNT(*)
+        FROM products
+        WHERE is_active = 1 AND stock_quantity <= min_stock_level
+        """;
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql);
