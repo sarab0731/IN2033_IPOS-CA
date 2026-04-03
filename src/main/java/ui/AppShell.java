@@ -400,10 +400,10 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
     public static JPanel createCard() {
         JPanel panel = new JPanel();
         panel.setBackground(ThemeManager.panelBackground());
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(ThemeManager.borderColor()),
-                new EmptyBorder(18, 18, 18, 18)
-        ));
+
+        // Removed white outline border for cleaner dark overview cards
+        panel.setBorder(new EmptyBorder(18, 18, 18, 18));
+
         return panel;
     }
 }

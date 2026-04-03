@@ -1,401 +1,346 @@
 package ui;
 
 import app.Session;
-import database.CustomerDB;
-import database.ProductDB;
-import database.RestockOrderDB;
-import database.SaleDB;
-import database.UserDB;
-import domain.RestockOrder;
 import domain.User;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
 import java.awt.*;
-import java.util.List;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 public class DashboardPanel extends JPanel implements ThemeManager.ThemeListener {
 
-    private JLabel salesTitleValue;
-    private JLabel salesSubtitleValue;
-    private JLabel salesBottom1;
-    private JLabel salesBottom2;
+    private final ScreenRouter router;
 
-    private JLabel customersTitleValue;
-    private JLabel customersSubtitleValue;
-    private JLabel customersBottom1;
-    private JLabel customersBottom2;
+    private JPanel contentPanel;
 
-    private JLabel stockTitleValue;
-    private JLabel stockSubtitleValue;
+    private JPanel salesCard;
+    private JPanel customersCard;
+    private JPanel stockCard;
+    private JPanel orderStatusCard;
+    private JPanel staffAccountsCard;
 
-    private DefaultTableModel orderTableModel;
-    private DefaultTableModel staffTableModel;
+    private JLabel salesTitleLabel;
+    private JLabel salesSubLabel;
+    private JLabel salesValueLabel;
+    private JLabel salesFooterLabel;
 
-    private JPanel orderStatusPanel;
-    private JPanel staffPanel;
-    private JTable orderTable;
-    private JTable staffTable;
-    private JScrollPane orderScrollPane;
-    private JScrollPane staffScrollPane;
-    private JLabel orderStatusTitle;
-    private JLabel staffTitle;
+    private JLabel customersTitleLabel;
+    private JLabel customersSubLabel;
+    private JLabel customersValueLabel;
+    private JLabel customersFooterLabel;
+
+    private JLabel stockTitleLabel;
+    private JLabel stockSubLabel;
+    private JLabel stockValueLabel;
+    private JLabel stockFooterLabel;
+
+    private JLabel orderStatusTitleLabel;
+    private JLabel staffAccountsTitleLabel;
+
+    private JTable orderStatusTable;
+    private JTable staffAccountsTable;
+
+    private JScrollPane orderStatusScrollPane;
+    private JScrollPane staffAccountsScrollPane;
 
     public DashboardPanel(ScreenRouter router) {
-        setLayout(new BorderLayout());
-        setBackground(ThemeManager.appBackground());
+        this.router = router;
 
-        JPanel dashboardContent = buildDashboardContent(router);
+        setLayout(new BorderLayout());
+        ThemeManager.register(this);
 
         AppShell shell = new AppShell(
                 router,
                 MainFrame.SCREEN_DASHBOARD,
-                "Welcome back, Username",
-                "Administrator",
-                dashboardContent
+                buildHeading(),
+                buildSubheading(),
+                buildDashboardContent()
         );
 
         add(shell, BorderLayout.CENTER);
-
-        ThemeManager.register(this);
         applyTheme();
-
-        addComponentListener(new java.awt.event.ComponentAdapter() {
-            @Override
-            public void componentShown(java.awt.event.ComponentEvent e) {
-                loadDashboardData();
-                User user = Session.getCurrentUser();
-                if (user != null) {
-                    revalidate();
-                    repaint();
-                }
-            }
-        });
     }
 
-    private JPanel buildDashboardContent(ScreenRouter router) {
-        JPanel content = new JPanel(new BorderLayout(18, 18));
-        content.setOpaque(false);
-
-        content.add(buildTopCards(router), BorderLayout.NORTH);
-        content.add(buildBottomSection(), BorderLayout.CENTER);
-
-        return content;
+    private String buildHeading() {
+        User user = Session.getCurrentUser();
+        if (user != null) {
+            return "Welcome back, " + user.getUsername();
+        }
+        return "Welcome back, Username";
     }
 
-    private JPanel buildTopCards(ScreenRouter router) {
-        JPanel cards = new JPanel(new GridLayout(1, 3, 18, 18));
-        cards.setOpaque(false);
-
-        cards.add(createSalesCard(router));
-        cards.add(createCustomersCard(router));
-        cards.add(createStockCard(router));
-
-        return cards;
+    private String buildSubheading() {
+        User user = Session.getCurrentUser();
+        if (user != null) {
+            return user.getRole();
+        }
+        return "Administrator";
     }
 
-    private JPanel createSalesCard(ScreenRouter router) {
-        JPanel card = createInteractiveCard(true, () -> router.goTo(MainFrame.SCREEN_SALES));
+    private JPanel buildDashboardContent() {
+        contentPanel = new JPanel(new BorderLayout(20, 20));
+        contentPanel.setBorder(new EmptyBorder(8, 8, 8, 8));
 
-        salesTitleValue = new JLabel("£0.00");
-        salesSubtitleValue = new JLabel("0 Orders");
-        salesBottom1 = new JLabel("£0.00");
-        salesBottom2 = new JLabel("last 14 days");
+        JPanel topCards = new JPanel(new GridLayout(1, 3, 20, 0));
+        topCards.setOpaque(false);
 
-        configureMainValue(salesTitleValue, true);
-        configureSubtitle(salesSubtitleValue, true);
-        configureBottomStrong(salesBottom1, true);
-        configureBottomMuted(salesBottom2, true);
+        salesCard = createInteractiveCard(MainFrame.SCREEN_SALES);
+        customersCard = createInteractiveCard(MainFrame.SCREEN_CUSTOMERS);
+        stockCard = createInteractiveCard(MainFrame.SCREEN_STOCK);
 
-        populateCard(card, "Total Sales", salesSubtitleValue, salesTitleValue, salesBottom1, salesBottom2, true);
-        return card;
+        buildSalesCard();
+        buildCustomersCard();
+        buildStockCard();
+
+        topCards.add(salesCard);
+        topCards.add(customersCard);
+        topCards.add(stockCard);
+
+        JPanel bottomSection = new JPanel(new GridLayout(1, 2, 20, 0));
+        bottomSection.setOpaque(false);
+
+        orderStatusCard = AppShell.createCard();
+        orderStatusCard.setLayout(new BorderLayout(12, 12));
+
+        staffAccountsCard = AppShell.createCard();
+        staffAccountsCard.setLayout(new BorderLayout(12, 12));
+
+        buildOrderStatusCard();
+        buildStaffAccountsCard();
+
+        bottomSection.add(orderStatusCard);
+        bottomSection.add(staffAccountsCard);
+
+        contentPanel.add(topCards, BorderLayout.NORTH);
+        contentPanel.add(bottomSection, BorderLayout.CENTER);
+
+        return contentPanel;
     }
 
-    private JPanel createCustomersCard(ScreenRouter router) {
-        JPanel card = createInteractiveCard(true, () -> router.goTo(MainFrame.SCREEN_CUSTOMERS));
-
-        customersTitleValue = new JLabel("0");
-        customersSubtitleValue = new JLabel("Active customers");
-        customersBottom1 = new JLabel("Live");
-        customersBottom2 = new JLabel("from database");
-
-        configureMainValue(customersTitleValue, true);
-        configureSubtitle(customersSubtitleValue, true);
-        configureBottomStrong(customersBottom1, true);
-        configureBottomMuted(customersBottom2, true);
-
-        populateCard(card, "Customers", customersSubtitleValue, customersTitleValue, customersBottom1, customersBottom2, true);
-        return card;
-    }
-
-    private JPanel createStockCard(ScreenRouter router) {
-        JPanel card = createInteractiveCard(true, () -> router.goTo(MainFrame.SCREEN_STOCK));
-
-        stockTitleValue = new JLabel("0");
-        stockSubtitleValue = new JLabel("0 Low Stock");
-
-        configureMainValue(stockTitleValue, true);
-        configureSubtitle(stockSubtitleValue, true);
-
-        JLabel empty1 = new JLabel("");
-        JLabel empty2 = new JLabel("");
-
-        populateCard(card, "Stock", stockSubtitleValue, stockTitleValue, empty1, empty2, true);
-        return card;
-    }
-
-    private JPanel createInteractiveCard(boolean dark, Runnable onClick) {
-        Color normalBg = dark ? new Color(30, 32, 38) : ThemeManager.panelBackground();
-        Color hoverBg = dark ? new Color(42, 45, 52) : ThemeManager.innerCardBackground();
-
+    private JPanel createInteractiveCard(String targetScreen) {
         JPanel card = AppShell.createCard();
-        card.setLayout(new BorderLayout(0, 12));
-        card.setPreferredSize(new Dimension(200, 150));
-        card.setBackground(normalBg);
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-        addCardInteraction(card, normalBg, hoverBg, onClick);
+        setPanelTreeBackground(card, ThemeManager.panelBackground());
+
+        MouseAdapter hoverHandler = new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                setPanelTreeBackground(card, ThemeManager.innerCardBackground());
+                card.repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                Point p = SwingUtilities.convertPoint(
+                        e.getComponent(),
+                        e.getPoint(),
+                        card
+                );
+
+                if (!card.contains(p)) {
+                    setPanelTreeBackground(card, ThemeManager.panelBackground());
+                    card.repaint();
+                }
+            }
+
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (targetScreen != null && router != null) {
+                    router.goTo(targetScreen);
+                }
+            }
+        };
+
+        card.addMouseListener(hoverHandler);
+
         return card;
     }
 
-    private void populateCard(JPanel card, String title, JLabel subtitleLabel, JLabel valueLabel,
-                              JLabel bottom1, JLabel bottom2, boolean dark) {
-        Color fg = dark ? Color.WHITE : ThemeManager.textPrimary();
+    private void buildSalesCard() {
+        salesTitleLabel = new JLabel("Total Sales");
+        salesTitleLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
 
-        JPanel top = new JPanel(new BorderLayout());
-        top.setOpaque(false);
+        salesSubLabel = new JLabel("1 Order");
+        salesSubLabel.setFont(new Font("SansSerif", Font.PLAIN, 13));
 
-        JLabel titleLabel = new JLabel(title);
-        titleLabel.setForeground(fg);
-        titleLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
+        salesValueLabel = new JLabel("£1,326.13");
+        salesValueLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
 
-        JPanel titleWrap = new JPanel();
-        titleWrap.setOpaque(false);
-        titleWrap.setLayout(new BoxLayout(titleWrap, BoxLayout.Y_AXIS));
-        titleWrap.add(titleLabel);
-        titleWrap.add(Box.createVerticalStrut(4));
-        titleWrap.add(subtitleLabel);
+        salesFooterLabel = new JLabel("£0.00   last 14 days");
+        salesFooterLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
 
         JLabel arrow = new JLabel("›");
-        arrow.setForeground(fg);
-        arrow.setFont(new Font("SansSerif", Font.BOLD, 18));
+        arrow.setFont(new Font("SansSerif", Font.BOLD, 24));
+        arrow.setAlignmentX(Component.RIGHT_ALIGNMENT);
 
-        top.add(titleWrap, BorderLayout.CENTER);
-        top.add(arrow, BorderLayout.EAST);
+        JPanel topRow = new JPanel(new BorderLayout());
+        topRow.setOpaque(true);
+        topRow.add(salesTitleLabel, BorderLayout.WEST);
+        topRow.add(arrow, BorderLayout.EAST);
 
-        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.LEFT, 16, 0));
-        bottom.setOpaque(false);
-        bottom.add(bottom1);
-        bottom.add(bottom2);
-
-        card.add(top, BorderLayout.NORTH);
-        card.add(valueLabel, BorderLayout.CENTER);
-        card.add(bottom, BorderLayout.SOUTH);
+        salesCard.add(topRow);
+        salesCard.add(Box.createVerticalStrut(6));
+        salesCard.add(salesSubLabel);
+        salesCard.add(Box.createVerticalStrut(22));
+        salesCard.add(salesValueLabel);
+        salesCard.add(Box.createVerticalGlue());
+        salesCard.add(salesFooterLabel);
     }
 
-    private void configureMainValue(JLabel label, boolean dark) {
-        label.setForeground(dark ? Color.WHITE : ThemeManager.textPrimary());
-        label.setFont(new Font("SansSerif", Font.BOLD, 20));
+    private void buildCustomersCard() {
+        customersTitleLabel = new JLabel("Customers");
+        customersTitleLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
+
+        customersSubLabel = new JLabel("Active customers");
+        customersSubLabel.setFont(new Font("SansSerif", Font.PLAIN, 13));
+
+        customersValueLabel = new JLabel("0");
+        customersValueLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
+
+        customersFooterLabel = new JLabel("Live   from database");
+        customersFooterLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
+
+        JLabel arrow = new JLabel("›");
+        arrow.setFont(new Font("SansSerif", Font.BOLD, 24));
+        arrow.setAlignmentX(Component.RIGHT_ALIGNMENT);
+
+        JPanel topRow = new JPanel(new BorderLayout());
+        topRow.setOpaque(true);
+        topRow.add(customersTitleLabel, BorderLayout.WEST);
+        topRow.add(arrow, BorderLayout.EAST);
+
+        customersCard.add(topRow);
+        customersCard.add(Box.createVerticalStrut(6));
+        customersCard.add(customersSubLabel);
+        customersCard.add(Box.createVerticalStrut(22));
+        customersCard.add(customersValueLabel);
+        customersCard.add(Box.createVerticalGlue());
+        customersCard.add(customersFooterLabel);
     }
 
-    private void configureSubtitle(JLabel label, boolean dark) {
-        label.setForeground(dark ? new Color(180, 180, 180) : ThemeManager.textSecondary());
-        label.setFont(new Font("SansSerif", Font.PLAIN, 13));
+    private void buildStockCard() {
+        stockTitleLabel = new JLabel("Stock");
+        stockTitleLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
+
+        stockSubLabel = new JLabel("0 Low Stock");
+        stockSubLabel.setFont(new Font("SansSerif", Font.PLAIN, 13));
+
+        stockValueLabel = new JLabel("3");
+        stockValueLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
+
+        stockFooterLabel = new JLabel("");
+        stockFooterLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
+
+        JLabel arrow = new JLabel("›");
+        arrow.setFont(new Font("SansSerif", Font.BOLD, 24));
+        arrow.setAlignmentX(Component.RIGHT_ALIGNMENT);
+
+        JPanel topRow = new JPanel(new BorderLayout());
+        topRow.setOpaque(true);
+        topRow.add(stockTitleLabel, BorderLayout.WEST);
+        topRow.add(arrow, BorderLayout.EAST);
+
+        stockCard.add(topRow);
+        stockCard.add(Box.createVerticalStrut(6));
+        stockCard.add(stockSubLabel);
+        stockCard.add(Box.createVerticalStrut(22));
+        stockCard.add(stockValueLabel);
+        stockCard.add(Box.createVerticalGlue());
+        stockCard.add(stockFooterLabel);
     }
 
-    private void configureBottomStrong(JLabel label, boolean dark) {
-        label.setForeground(dark ? Color.WHITE : ThemeManager.textPrimary());
-        label.setFont(new Font("SansSerif", Font.BOLD, 13));
-    }
-
-    private void configureBottomMuted(JLabel label, boolean dark) {
-        label.setForeground(dark ? new Color(180, 180, 180) : ThemeManager.textSecondary());
-        label.setFont(new Font("SansSerif", Font.BOLD, 13));
-    }
-
-    private void addCardInteraction(JPanel card, Color normalBg, Color hoverBg, Runnable onClick) {
-        java.awt.event.MouseAdapter adapter = new java.awt.event.MouseAdapter() {
-            @Override
-            public void mouseEntered(java.awt.event.MouseEvent e) {
-                card.setBackground(hoverBg);
-                card.repaint();
-            }
-
-            @Override
-            public void mouseExited(java.awt.event.MouseEvent e) {
-                card.setBackground(normalBg);
-                card.repaint();
-            }
-
-            @Override
-            public void mouseClicked(java.awt.event.MouseEvent e) {
-                if (onClick != null) {
-                    onClick.run();
-                }
-            }
-        };
-
-        card.addMouseListener(adapter);
-
-        for (Component component : card.getComponents()) {
-            component.addMouseListener(adapter);
-
-            if (component instanceof Container container) {
-                for (Component child : container.getComponents()) {
-                    child.addMouseListener(adapter);
-                }
-            }
-        }
-    }
-
-    private JPanel buildBottomSection() {
-        JPanel bottom = new JPanel(new GridLayout(1, 2, 18, 18));
-        bottom.setOpaque(false);
-
-        bottom.add(buildOrderStatusPanel());
-        bottom.add(buildStaffPanel());
-
-        return bottom;
-    }
-
-    private JPanel buildOrderStatusPanel() {
-        orderStatusPanel = AppShell.createCard();
-        orderStatusPanel.setLayout(new BorderLayout(12, 12));
-
-        orderStatusTitle = new JLabel("Order Status");
-        orderStatusTitle.setFont(new Font("SansSerif", Font.BOLD, 16));
-
-        JPanel top = new JPanel(new BorderLayout());
-        top.setOpaque(false);
-        top.add(orderStatusTitle, BorderLayout.WEST);
+    private void buildOrderStatusCard() {
+        orderStatusTitleLabel = new JLabel("Order Status");
+        orderStatusTitleLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
 
         String[] columns = {"Order Number", "Merchant", "Status", "Total £", "Created At"};
-        orderTableModel = new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int row, int col) {
-                return false;
-            }
-        };
+        DefaultTableModel model = new DefaultTableModel(columns, 0);
+        orderStatusTable = new JTable(model);
+        configureTable(orderStatusTable);
 
-        orderTable = new JTable(orderTableModel);
-        styleTable(orderTable);
+        orderStatusScrollPane = new JScrollPane(orderStatusTable);
+        styleScrollPane(orderStatusScrollPane);
 
-        orderScrollPane = new JScrollPane(orderTable);
-        styleScrollPane(orderScrollPane);
-
-        orderStatusPanel.add(top, BorderLayout.NORTH);
-        orderStatusPanel.add(orderScrollPane, BorderLayout.CENTER);
-
-        return orderStatusPanel;
+        orderStatusCard.add(orderStatusTitleLabel, BorderLayout.NORTH);
+        orderStatusCard.add(orderStatusScrollPane, BorderLayout.CENTER);
     }
 
-    private JPanel buildStaffPanel() {
-        staffPanel = AppShell.createCard();
-        staffPanel.setLayout(new BorderLayout(12, 12));
-
-        staffTitle = new JLabel("Staff Accounts");
-        staffTitle.setFont(new Font("SansSerif", Font.BOLD, 16));
+    private void buildStaffAccountsCard() {
+        staffAccountsTitleLabel = new JLabel("Staff Accounts");
+        staffAccountsTitleLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
 
         String[] columns = {"Name", "Role"};
-        staffTableModel = new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int row, int col) {
-                return false;
-            }
-        };
+        DefaultTableModel model = new DefaultTableModel(columns, 0);
+        model.addRow(new Object[]{"Administrator", "ADMIN"});
+        model.addRow(new Object[]{"John Pharmacist", "PHARMACIST"});
+        model.addRow(new Object[]{"Store Manager", "MANAGER"});
 
-        staffTable = new JTable(staffTableModel);
-        styleTable(staffTable);
+        staffAccountsTable = new JTable(model);
+        configureTable(staffAccountsTable);
 
-        staffScrollPane = new JScrollPane(staffTable);
-        styleScrollPane(staffScrollPane);
+        staffAccountsScrollPane = new JScrollPane(staffAccountsTable);
+        styleScrollPane(staffAccountsScrollPane);
 
-        staffPanel.add(staffTitle, BorderLayout.NORTH);
-        staffPanel.add(staffScrollPane, BorderLayout.CENTER);
-
-        return staffPanel;
+        staffAccountsCard.add(staffAccountsTitleLabel, BorderLayout.NORTH);
+        staffAccountsCard.add(staffAccountsScrollPane, BorderLayout.CENTER);
     }
 
-    private void styleTable(JTable table) {
-        table.setRowHeight(36);
-        table.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        table.setBackground(ThemeManager.tableBackground());
-        table.setForeground(ThemeManager.textPrimary());
-        table.setSelectionBackground(ThemeManager.selectionBackground());
-        table.setSelectionForeground(ThemeManager.textPrimary());
-        table.setGridColor(ThemeManager.tableGrid());
+    private void configureTable(JTable table) {
+        table.setRowHeight(44);
+        table.setShowGrid(true);
+        table.setIntercellSpacing(new Dimension(1, 1));
         table.setFillsViewportHeight(true);
-        table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
-        table.getTableHeader().setBackground(ThemeManager.tableHeaderBackground());
-        table.getTableHeader().setForeground(ThemeManager.textPrimary());
+        table.setBorder(BorderFactory.createEmptyBorder());
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.setDefaultEditor(Object.class, null);
+
+        JTableHeader header = table.getTableHeader();
+        header.setReorderingAllowed(false);
+        header.setResizingAllowed(true);
+        header.setFont(new Font("SansSerif", Font.BOLD, 13));
+        header.setBorder(BorderFactory.createEmptyBorder());
+
+        DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
+        renderer.setBorder(new EmptyBorder(0, 10, 0, 10));
+        renderer.setHorizontalAlignment(SwingConstants.LEFT);
+        table.setDefaultRenderer(Object.class, renderer);
     }
 
     private void styleScrollPane(JScrollPane scrollPane) {
-        scrollPane.setBorder(BorderFactory.createLineBorder(ThemeManager.borderColor()));
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.getViewport().setBorder(null);
+        scrollPane.getViewport().setOpaque(true);
         scrollPane.getViewport().setBackground(ThemeManager.tableBackground());
         scrollPane.setBackground(ThemeManager.tableBackground());
-        scrollPane.getVerticalScrollBar().setBackground(ThemeManager.panelBackground());
-        scrollPane.getHorizontalScrollBar().setBackground(ThemeManager.panelBackground());
-    }
+        scrollPane.setOpaque(true);
 
-    private void loadDashboardData() {
-        int salesCount = SaleDB.getSalesCount();
-        double totalSales = SaleDB.getTotalSalesValue();
-        double recentSales = SaleDB.getSalesValueLastDays(14);
-
-        int customerCount = CustomerDB.getActiveCustomerCount();
-        int productCount = ProductDB.getActiveProductCount();
-        int lowStockCount = ProductDB.getLowStockCount();
-
-        salesTitleValue.setText(String.format("£%,.2f", totalSales));
-        salesSubtitleValue.setText(salesCount + (salesCount == 1 ? " Order" : " Orders"));
-        salesBottom1.setText(String.format("£%,.2f", recentSales));
-        salesBottom2.setText("last 14 days");
-
-        customersTitleValue.setText(String.format("%,d", customerCount));
-        customersSubtitleValue.setText("Active customers");
-        customersBottom1.setText("Live");
-        customersBottom2.setText("from database");
-
-        stockTitleValue.setText(String.format("%,d", productCount));
-        stockSubtitleValue.setText(lowStockCount + " Low Stock");
-
-        loadOrderTable();
-        loadStaffTable();
-    }
-
-    private void loadOrderTable() {
-        if (orderTableModel == null) {
-            return;
+        if (scrollPane.getVerticalScrollBar() != null) {
+            scrollPane.getVerticalScrollBar().setBackground(ThemeManager.panelBackground());
+            scrollPane.getVerticalScrollBar().setBorder(BorderFactory.createEmptyBorder());
         }
 
-        orderTableModel.setRowCount(0);
-        List<RestockOrder> orders = RestockOrderDB.getAllOrders();
-
-        int limit = Math.min(orders.size(), 6);
-        for (int i = 0; i < limit; i++) {
-            RestockOrder o = orders.get(i);
-            orderTableModel.addRow(new Object[]{
-                    o.getOrderNumber(),
-                    o.getMerchantId(),
-                    o.getStatus(),
-                    String.format("£%.2f", o.getTotalValue()),
-                    o.getCreatedAt()
-            });
+        if (scrollPane.getHorizontalScrollBar() != null) {
+            scrollPane.getHorizontalScrollBar().setBackground(ThemeManager.panelBackground());
+            scrollPane.getHorizontalScrollBar().setBorder(BorderFactory.createEmptyBorder());
         }
     }
 
-    private void loadStaffTable() {
-        if (staffTableModel == null) {
-            return;
+    private void setPanelTreeBackground(Component component, Color color) {
+        if (component instanceof JPanel) {
+            component.setBackground(color);
         }
 
-        staffTableModel.setRowCount(0);
-        for (User user : UserDB.getActiveUsers()) {
-            staffTableModel.addRow(new Object[]{
-                    user.getFullName(),
-                    user.getRole()
-            });
+        if (component instanceof Container) {
+            for (Component child : ((Container) component).getComponents()) {
+                setPanelTreeBackground(child, color);
+            }
         }
     }
 
@@ -403,39 +348,90 @@ public class DashboardPanel extends JPanel implements ThemeManager.ThemeListener
     public void applyTheme() {
         setBackground(ThemeManager.appBackground());
 
-        if (orderStatusPanel != null) {
-            orderStatusPanel.setBackground(ThemeManager.panelBackground());
+        if (contentPanel != null) {
+            contentPanel.setBackground(ThemeManager.appBackground());
         }
 
-        if (staffPanel != null) {
-            staffPanel.setBackground(ThemeManager.panelBackground());
+        applyCardTheme(salesCard);
+        applyCardTheme(customersCard);
+        applyCardTheme(stockCard);
+        applyCardTheme(orderStatusCard);
+        applyCardTheme(staffAccountsCard);
+
+        applyLabelPrimary(salesTitleLabel);
+        applyLabelSecondary(salesSubLabel);
+        applyLabelPrimary(salesValueLabel);
+        applyLabelSecondary(salesFooterLabel);
+
+        applyLabelPrimary(customersTitleLabel);
+        applyLabelSecondary(customersSubLabel);
+        applyLabelPrimary(customersValueLabel);
+        applyLabelSecondary(customersFooterLabel);
+
+        applyLabelPrimary(stockTitleLabel);
+        applyLabelSecondary(stockSubLabel);
+        applyLabelPrimary(stockValueLabel);
+        applyLabelSecondary(stockFooterLabel);
+
+        applyLabelPrimary(orderStatusTitleLabel);
+        applyLabelPrimary(staffAccountsTitleLabel);
+
+        applyTableTheme(orderStatusTable);
+        applyTableTheme(staffAccountsTable);
+
+        if (orderStatusScrollPane != null) {
+            styleScrollPane(orderStatusScrollPane);
         }
 
-        if (orderStatusTitle != null) {
-            orderStatusTitle.setForeground(ThemeManager.textPrimary());
-        }
-
-        if (staffTitle != null) {
-            staffTitle.setForeground(ThemeManager.textPrimary());
-        }
-
-        if (orderTable != null) {
-            styleTable(orderTable);
-        }
-
-        if (staffTable != null) {
-            styleTable(staffTable);
-        }
-
-        if (orderScrollPane != null) {
-            styleScrollPane(orderScrollPane);
-        }
-
-        if (staffScrollPane != null) {
-            styleScrollPane(staffScrollPane);
+        if (staffAccountsScrollPane != null) {
+            styleScrollPane(staffAccountsScrollPane);
         }
 
         repaint();
         revalidate();
+    }
+
+    private void applyCardTheme(JPanel panel) {
+        if (panel != null) {
+            setPanelTreeBackground(panel, ThemeManager.panelBackground());
+        }
+    }
+
+    private void applyLabelPrimary(JLabel label) {
+        if (label != null) {
+            label.setForeground(ThemeManager.textPrimary());
+        }
+    }
+
+    private void applyLabelSecondary(JLabel label) {
+        if (label != null) {
+            label.setForeground(ThemeManager.textSecondary());
+        }
+    }
+
+    private void applyTableTheme(JTable table) {
+        if (table == null) {
+            return;
+        }
+
+        table.setBackground(ThemeManager.tableBackground());
+        table.setForeground(ThemeManager.textPrimary());
+        table.setGridColor(ThemeManager.tableGrid());
+        table.setSelectionBackground(ThemeManager.selectionBackground());
+        table.setSelectionForeground(ThemeManager.textPrimary());
+
+        JTableHeader header = table.getTableHeader();
+        if (header != null) {
+            header.setBackground(ThemeManager.tableHeaderBackground());
+            header.setForeground(ThemeManager.textPrimary());
+            header.setBorder(BorderFactory.createEmptyBorder());
+        }
+
+        DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
+        renderer.setBackground(ThemeManager.tableBackground());
+        renderer.setForeground(ThemeManager.textPrimary());
+        renderer.setBorder(new EmptyBorder(0, 10, 0, 10));
+        renderer.setHorizontalAlignment(SwingConstants.LEFT);
+        table.setDefaultRenderer(Object.class, renderer);
     }
 }
