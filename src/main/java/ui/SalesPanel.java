@@ -1,3 +1,4 @@
+
 package ui;
 
 import app.Session;
@@ -9,266 +10,255 @@ import domain.Product;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
 import java.awt.*;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public class SalesPanel extends JPanel {
+public class SalesPanel extends JPanel implements ThemeManager.ThemeListener {
 
-    private DefaultTableModel productModel;
-    private DefaultTableModel cartModel;
+    private final ScreenRouter router;
 
-    private JTable productTable;
+    private JPanel contentPanel;
+    private JPanel leftCard;
+    private JPanel rightCard;
+    private JPanel topControls;
+    private JPanel bottomControls;
+    private JPanel centerSection;
+
+    private JTable productsTable;
     private JTable cartTable;
 
-    private final Map<Product, Integer> cart = new LinkedHashMap<>();
+    private JScrollPane productsScrollPane;
+    private JScrollPane cartScrollPane;
 
-    private JLabel customerLabel;
+    private JButton addToCartBtn;
+    private JButton removeItemBtn;
+    private JButton selectCustomerBtn;
+    private JButton clearCartBtn;
+    private JButton confirmSaleBtn;
+
+    private JComboBox<String> filterCombo;
+    private JComboBox<String> sortCombo;
+
+    private JRadioButton accountHolderRadio;
+    private JRadioButton occasionalCustomerRadio;
+
+    private JLabel availableProductsLabel;
+    private JLabel currentCartLabel;
+    private JLabel saleTypeLabel;
+    private JLabel customerSelectedLabel;
     private JLabel totalLabel;
-    private Customer selectedCustomer = null;
 
-    private JRadioButton accountBtn;
-    private JRadioButton occasionalBtn;
-    private JComboBox<String> paymentCombo;
+    private DefaultTableModel productsModel;
+    private DefaultTableModel cartModel;
+    private final Map<Product, Integer> cart = new LinkedHashMap<>();
+    private Customer selectedCustomer;
 
     public SalesPanel(ScreenRouter router) {
-        setLayout(new BorderLayout());
-        setBackground(new Color(242, 242, 242));
+        this.router = router;
 
-        JPanel salesContent = buildSalesContent(router);
+        setLayout(new BorderLayout());
+        ThemeManager.register(this);
 
         AppShell shell = new AppShell(
                 router,
                 MainFrame.SCREEN_SALES,
                 "Product Information",
                 "Record and process sales",
-                salesContent
+                buildContent()
         );
 
         add(shell, BorderLayout.CENTER);
-
-        addComponentListener(new java.awt.event.ComponentAdapter() {
-            @Override
-            public void componentShown(java.awt.event.ComponentEvent e) {
-                loadCatalogue();
-                clearCart();
-            }
-        });
+        wireActions();
+        loadCatalogue();
+        applyTheme();
     }
 
-    private JPanel buildSalesContent(ScreenRouter router) {
-        JPanel outer = new JPanel(new BorderLayout());
-        outer.setOpaque(false);
+    private JPanel buildContent() {
+        contentPanel = new JPanel(new BorderLayout(22, 22));
+        contentPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
+        contentPanel.setOpaque(false);
 
-        JPanel card = AppShell.createCard();
-        card.setLayout(new BorderLayout(0, 18));
-        card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(232, 232, 232)),
-                new EmptyBorder(20, 20, 20, 20)
-        ));
+        topControls = buildTopControls();
 
-        card.add(buildTopControls(), BorderLayout.NORTH);
-        card.add(buildTablesSection(), BorderLayout.CENTER);
-        card.add(buildBottomControls(), BorderLayout.SOUTH);
+        centerSection = new JPanel(new GridLayout(1, 2, 22, 0));
+        centerSection.setOpaque(false);
 
-        outer.add(card, BorderLayout.CENTER);
-        return outer;
+        leftCard = AppShell.createCard();
+        leftCard.setLayout(new BorderLayout(14, 14));
+        leftCard.setBorder(new EmptyBorder(20, 20, 20, 20));
+
+        rightCard = AppShell.createCard();
+        rightCard.setLayout(new BorderLayout(14, 14));
+        rightCard.setBorder(new EmptyBorder(20, 20, 20, 20));
+
+        availableProductsLabel = new JLabel("Available Products");
+        availableProductsLabel.setFont(new Font("SansSerif", Font.BOLD, 18));
+
+        currentCartLabel = new JLabel("Current Cart");
+        currentCartLabel.setFont(new Font("SansSerif", Font.BOLD, 18));
+
+        productsModel = new DefaultTableModel(
+                new String[]{"Product ID", "Description", "Price £", "VAT %", "Stock"}, 0
+        ) {
+            @Override public boolean isCellEditable(int row, int col) { return false; }
+        };
+        productsTable = new JTable(productsModel);
+
+        cartModel = new DefaultTableModel(
+                new String[]{"Description", "Qty", "Unit £", "Line Total £"}, 0
+        ) {
+            @Override public boolean isCellEditable(int row, int col) { return false; }
+        };
+        cartTable = new JTable(cartModel);
+
+        configureTable(productsTable);
+        configureTable(cartTable);
+
+        productsScrollPane = new JScrollPane(productsTable);
+        cartScrollPane = new JScrollPane(cartTable);
+
+        styleScrollPane(productsScrollPane);
+        styleScrollPane(cartScrollPane);
+
+        leftCard.add(availableProductsLabel, BorderLayout.NORTH);
+        leftCard.add(productsScrollPane, BorderLayout.CENTER);
+
+        JPanel rightInner = new JPanel(new BorderLayout(14, 14));
+        rightInner.setOpaque(false);
+        rightInner.add(currentCartLabel, BorderLayout.NORTH);
+        rightInner.add(cartScrollPane, BorderLayout.CENTER);
+
+        totalLabel = new JLabel("Total: £0.00");
+        totalLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
+
+        JPanel totalWrap = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        totalWrap.setOpaque(false);
+        totalWrap.add(totalLabel);
+
+        rightInner.add(totalWrap, BorderLayout.SOUTH);
+        rightCard.add(rightInner, BorderLayout.CENTER);
+
+        centerSection.add(leftCard);
+        centerSection.add(rightCard);
+
+        bottomControls = buildBottomControls();
+
+        contentPanel.add(topControls, BorderLayout.NORTH);
+        contentPanel.add(centerSection, BorderLayout.CENTER);
+        contentPanel.add(bottomControls, BorderLayout.SOUTH);
+
+        return contentPanel;
     }
 
     private JPanel buildTopControls() {
-        JPanel top = new JPanel(new BorderLayout());
-        top.setOpaque(false);
+        JPanel panel = new JPanel(new BorderLayout(20, 0));
+        panel.setOpaque(false);
 
-        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 0));
         left.setOpaque(false);
 
-        JButton addToCartBtn = buildDarkButton("+  Add To Cart");
-        addToCartBtn.addActionListener(e -> addSelectedProductToCart());
+        addToCartBtn = new JButton("+  Add To Cart");
+        removeItemBtn = new JButton("Remove Item");
 
-        JButton removeBtn = buildLightButton("Remove Item");
-        removeBtn.addActionListener(e -> removeSelectedCartItem());
+        setControlSize(addToCartBtn, 150, 42);
+        setControlSize(removeItemBtn, 140, 42);
 
         left.add(addToCartBtn);
-        left.add(removeBtn);
+        left.add(removeItemBtn);
 
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 0));
         right.setOpaque(false);
 
-        JComboBox<String> fakeFilter = new JComboBox<>(new String[]{
-                "All Transactions", "Current Cart", "Ready to Confirm"
-        });
-        JComboBox<String> fakeSort = new JComboBox<>(new String[]{
-                "Sort by: Date", "Sort by: Product", "Sort by: Amount"
-        });
+        filterCombo = new JComboBox<>(new String[]{"All Products", "In Stock", "Low Stock"});
+        sortCombo = new JComboBox<>(new String[]{"Sort by: Name", "Sort by: Price", "Sort by: Stock"});
 
-        styleCombo(fakeFilter);
-        styleCombo(fakeSort);
+        setControlSize(filterCombo, 180, 42);
+        setControlSize(sortCombo, 160, 42);
 
-        right.add(fakeFilter);
-        right.add(fakeSort);
+        right.add(filterCombo);
+        right.add(sortCombo);
 
-        top.add(left, BorderLayout.WEST);
-        top.add(right, BorderLayout.EAST);
-
-        return top;
-    }
-
-    private JPanel buildTablesSection() {
-        JPanel center = new JPanel(new GridLayout(1, 2, 18, 18));
-        center.setOpaque(false);
-
-        center.add(buildCataloguePanel());
-        center.add(buildCartPanel());
-
-        return center;
-    }
-
-    private JPanel buildCataloguePanel() {
-        JPanel panel = new JPanel(new BorderLayout(0, 12));
-        panel.setOpaque(false);
-        applyPanelTheme(panel);
-        panel.setBackground(Color.WHITE);
-
-        JLabel title = new JLabel("Available Products");
-        title.setFont(new Font("SansSerif", Font.BOLD, 16));
-        title.setForeground(new Color(35, 35, 35));
-
-        String[] prodCols = {"Product ID", "Description", "Price £", "VAT %", "Stock"};
-        productModel = new DefaultTableModel(prodCols, 0) {
-            @Override
-            public boolean isCellEditable(int r, int c) {
-                return false;
-            }
-        };
-
-        productTable = new JTable(productModel);
-        productTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        productTable.setRowHeight(38);
-        productTable.setShowGrid(false);
-        productTable.setIntercellSpacing(new Dimension(0, 0));
-        productTable.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        productTable.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
-        productTable.getTableHeader().setReorderingAllowed(false);
-
-        JScrollPane scrollPane = themedScrollPane(productTable);
-
-        panel.add(title, BorderLayout.NORTH);
-        panel.add(scrollPane, BorderLayout.CENTER);
-
-        return panel;
-    }
-
-    private JPanel buildCartPanel() {
-        JPanel panel = new JPanel(new BorderLayout(0, 12));
-        panel.setOpaque(false);
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(235, 235, 235)),
-                new EmptyBorder(12, 12, 12, 12)
-        ));
-        panel.setBackground(Color.WHITE);
-
-        JLabel title = new JLabel("Current Cart");
-        title.setFont(new Font("SansSerif", Font.BOLD, 16));
-        title.setForeground(new Color(35, 35, 35));
-
-        String[] cartCols = {"Description", "Qty", "Unit £", "Line Total £"};
-        cartModel = new DefaultTableModel(cartCols, 0) {
-            @Override
-            public boolean isCellEditable(int r, int c) {
-                return false;
-            }
-        };
-
-        cartTable = new JTable(cartModel);
-        cartTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        cartTable.setRowHeight(38);
-        cartTable.setShowGrid(false);
-        cartTable.setIntercellSpacing(new Dimension(0, 0));
-        cartTable.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        cartTable.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
-        cartTable.getTableHeader().setReorderingAllowed(false);
-
-        totalLabel = new JLabel("Total: £0.00");
-        totalLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
-        totalLabel.setForeground(new Color(35, 35, 35));
-        totalLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-
-        JScrollPane scrollPane = new JScrollPane(cartTable);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-
-        panel.add(title, BorderLayout.NORTH);
-        panel.add(scrollPane, BorderLayout.CENTER);
-        panel.add(totalLabel, BorderLayout.SOUTH);
+        panel.add(left, BorderLayout.WEST);
+        panel.add(right, BorderLayout.EAST);
 
         return panel;
     }
 
     private JPanel buildBottomControls() {
-        JPanel bottom = new JPanel(new BorderLayout(18, 0));
-        bottom.setOpaque(false);
-        bottom.setBorder(new EmptyBorder(8, 0, 0, 0));
+        JPanel panel = new JPanel(new BorderLayout(20, 0));
+        panel.setOpaque(false);
+        panel.setBorder(new EmptyBorder(6, 0, 0, 0));
 
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
         left.setOpaque(false);
 
-        accountBtn = new JRadioButton("Account Holder");
-        occasionalBtn = new JRadioButton("Occasional Customer", true);
+        saleTypeLabel = new JLabel("Sale type:");
 
-        styleRadio(accountBtn);
-        styleRadio(occasionalBtn);
+        accountHolderRadio = new JRadioButton("Account Holder");
+        occasionalCustomerRadio = new JRadioButton("Occasional Customer");
 
-        ButtonGroup typeGroup = new ButtonGroup();
-        typeGroup.add(accountBtn);
-        typeGroup.add(occasionalBtn);
+        ButtonGroup group = new ButtonGroup();
+        group.add(accountHolderRadio);
+        group.add(occasionalCustomerRadio);
+        occasionalCustomerRadio.setSelected(true);
 
-        JButton selectCustomerBtn = buildLightButton("Select Customer");
-        selectCustomerBtn.setEnabled(false);
+        selectCustomerBtn = new JButton("Select Customer");
+        setControlSize(selectCustomerBtn, 160, 42);
 
-        customerLabel = new JLabel("No customer selected");
-        customerLabel.setForeground(new Color(120, 120, 120));
-        customerLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        customerSelectedLabel = new JLabel("No customer selected");
 
-        paymentCombo = new JComboBox<>(new String[]{"CASH", "CARD"});
-        styleCombo(paymentCombo);
-
-        left.add(new JLabel("Sale type:"));
-        left.add(accountBtn);
-        left.add(occasionalBtn);
+        left.add(saleTypeLabel);
+        left.add(accountHolderRadio);
+        left.add(occasionalCustomerRadio);
+        left.add(Box.createHorizontalStrut(8));
         left.add(selectCustomerBtn);
-        left.add(customerLabel);
-        left.add(new JLabel("Payment:"));
-        left.add(paymentCombo);
+        left.add(customerSelectedLabel);
 
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 0));
         right.setOpaque(false);
 
-        JButton clearBtn = buildLightButton("Clear Cart");
-        JButton confirmBtn = buildDarkButton("Confirm Sale");
+        clearCartBtn = new JButton("Clear Cart");
+        confirmSaleBtn = new JButton("Confirm Sale");
 
-        clearBtn.addActionListener(e -> clearCart());
-        confirmBtn.addActionListener(e -> confirmSale());
+        setControlSize(clearCartBtn, 120, 42);
+        setControlSize(confirmSaleBtn, 145, 42);
 
-        right.add(clearBtn);
-        right.add(confirmBtn);
+        right.add(clearCartBtn);
+        right.add(confirmSaleBtn);
 
-        bottom.add(left, BorderLayout.CENTER);
-        bottom.add(right, BorderLayout.EAST);
+        panel.add(left, BorderLayout.WEST);
+        panel.add(right, BorderLayout.EAST);
 
-        accountBtn.addActionListener(e -> {
-            paymentCombo.setModel(new DefaultComboBoxModel<>(new String[]{"CARD", "CREDIT_ACCOUNT"}));
-            styleCombo(paymentCombo);
+        return panel;
+    }
+
+    private void wireActions() {
+        addToCartBtn.addActionListener(e -> addSelectedProductToCart());
+        removeItemBtn.addActionListener(e -> removeSelectedCartItem());
+        clearCartBtn.addActionListener(e -> clearCart());
+        confirmSaleBtn.addActionListener(e -> confirmSale());
+
+        filterCombo.addActionListener(e -> loadCatalogue());
+        sortCombo.addActionListener(e -> loadCatalogue());
+
+        accountHolderRadio.addActionListener(e -> {
             selectCustomerBtn.setEnabled(true);
+            selectedCustomer = null;
+            customerSelectedLabel.setText("No customer selected");
         });
 
-        occasionalBtn.addActionListener(e -> {
-            paymentCombo.setModel(new DefaultComboBoxModel<>(new String[]{"CASH", "CARD"}));
-            styleCombo(paymentCombo);
+        occasionalCustomerRadio.addActionListener(e -> {
             selectedCustomer = null;
-            customerLabel.setText("No customer selected");
+            customerSelectedLabel.setText("No customer selected");
             selectCustomerBtn.setEnabled(false);
         });
+
+        selectCustomerBtn.setEnabled(false);
 
         selectCustomerBtn.addActionListener(e -> {
             List<Customer> customers = CustomerDB.getAllActiveCustomers();
@@ -277,94 +267,57 @@ public class SalesPanel extends JPanel {
                 return;
             }
 
-            Customer[] arr = customers.toArray(new Customer[0]);
             Customer chosen = (Customer) JOptionPane.showInputDialog(
                     this,
                     "Select account holder:",
                     "Customer",
                     JOptionPane.PLAIN_MESSAGE,
                     null,
-                    arr,
-                    arr[0]
+                    customers.toArray(),
+                    customers.get(0)
             );
 
             if (chosen != null) {
                 if (!chosen.isActive()) {
-                    JOptionPane.showMessageDialog(
-                            this,
-                            "Account is " + chosen.getAccountStatus() + ". Cannot process sale."
-                    );
+                    JOptionPane.showMessageDialog(this, "The selected account is " + chosen.getAccountStatus() + ".");
                     return;
                 }
-
                 selectedCustomer = chosen;
-                customerLabel.setText(
-                        chosen.getFullName()
-                                + " | Balance: £" + String.format("%.2f", chosen.getCurrentBalance())
-                                + " / Limit: £" + String.format("%.2f", chosen.getCreditLimit())
-                );
+                customerSelectedLabel.setText(chosen.getFullName() + " | Balance £" +
+                        String.format("%.2f", chosen.getCurrentBalance()));
             }
         });
 
-        return bottom;
-    }
-
-    private JButton buildDarkButton(String text) {
-        JButton btn = new JButton(text);
-        btn.setFocusPainted(false);
-        btn.setBorderPainted(false);
-        btn.setContentAreaFilled(true);
-        btn.setOpaque(true);
-        btn.setBackground(ThemeManager.buttonDark());
-        btn.setForeground(Color.WHITE);
-        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setBorder(new EmptyBorder(9, 16, 9, 16));
-        return btn;
-    }
-
-    private JButton buildLightButton(String text) {
-        JButton btn = new JButton(text);
-        btn.setFocusPainted(false);
-        btn.setContentAreaFilled(true);
-        btn.setOpaque(true);
-        btn.setBackground(ThemeManager.buttonLight());
-        btn.setForeground(ThemeManager.textPrimary());
-        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(220, 220, 220)),
-                new EmptyBorder(9, 16, 9, 16)
-        ));
-        return btn;
-    }
-
-    private void styleCombo(JComboBox<String> combo) {
-        combo.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        combo.setBackground(Color.WHITE);
-        combo.setForeground(new Color(80, 80, 80));
-        combo.setFocusable(false);
-        combo.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(220, 220, 220)),
-                new EmptyBorder(4, 8, 4, 8)
-        ));
-    }
-
-    private void styleRadio(JRadioButton radio) {
-        radio.setOpaque(false);
-        radio.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        radio.setForeground(new Color(45, 45, 45));
-        radio.setFocusPainted(false);
+        addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentShown(java.awt.event.ComponentEvent e) {
+                loadCatalogue();
+            }
+        });
     }
 
     private void loadCatalogue() {
-        if (productModel == null) {
-            return;
+        productsModel.setRowCount(0);
+        List<Product> products = ProductDB.getAllProducts();
+
+        String filter = (String) filterCombo.getSelectedItem();
+        String sort = (String) sortCombo.getSelectedItem();
+
+        products.removeIf(p ->
+                "In Stock".equals(filter) && p.getStockQuantity() <= 0 ||
+                "Low Stock".equals(filter) && !p.isLowStock()
+        );
+
+        if ("Sort by: Price".equals(sort)) {
+            products.sort((a, b) -> Double.compare(a.getPrice(), b.getPrice()));
+        } else if ("Sort by: Stock".equals(sort)) {
+            products.sort((a, b) -> Integer.compare(b.getStockQuantity(), a.getStockQuantity()));
+        } else {
+            products.sort((a, b) -> a.getDescription().compareToIgnoreCase(b.getDescription()));
         }
 
-        productModel.setRowCount(0);
-        for (Product p : ProductDB.getAllProducts()) {
-            productModel.addRow(new Object[]{
+        for (Product p : products) {
+            productsModel.addRow(new Object[]{
                     p.getProductId(),
                     p.getDescription(),
                     String.format("%.2f", p.getPrice()),
@@ -375,46 +328,34 @@ public class SalesPanel extends JPanel {
     }
 
     private void addSelectedProductToCart() {
-        int row = productTable.getSelectedRow();
+        int row = productsTable.getSelectedRow();
         if (row == -1) {
             JOptionPane.showMessageDialog(this, "Please select a product.");
             return;
         }
 
-        int productId = (int) productModel.getValueAt(row, 0);
-        Product product = ProductDB.getAllProducts().stream()
-                .filter(p -> p.getProductId() == productId)
-                .findFirst()
-                .orElse(null);
-
+        int productId = (int) productsModel.getValueAt(row, 0);
+        Product product = ProductDB.getById(productId);
         if (product == null) {
+            JOptionPane.showMessageDialog(this, "Could not load the selected product.");
             return;
         }
 
         String input = JOptionPane.showInputDialog(this, "Quantity:");
-        if (input == null || input.trim().isEmpty()) {
-            return;
-        }
+        if (input == null || input.trim().isEmpty()) return;
 
         try {
             int qty = Integer.parseInt(input.trim());
-            if (qty <= 0) {
-                throw new NumberFormatException();
-            }
-
+            if (qty <= 0) throw new NumberFormatException();
             if (qty > product.getStockQuantity()) {
-                JOptionPane.showMessageDialog(
-                        this,
-                        "Not enough stock. Available: " + product.getStockQuantity()
-                );
+                JOptionPane.showMessageDialog(this, "Not enough stock. Available: " + product.getStockQuantity());
                 return;
             }
 
             cart.merge(product, qty, Integer::sum);
             refreshCart();
-
         } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Please enter a valid quantity.");
+            JOptionPane.showMessageDialog(this, "Please enter a valid positive quantity.");
         }
     }
 
@@ -424,7 +365,6 @@ public class SalesPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Please select an item to remove.");
             return;
         }
-
         Product key = (Product) cart.keySet().toArray()[row];
         cart.remove(key);
         refreshCart();
@@ -432,13 +372,12 @@ public class SalesPanel extends JPanel {
 
     private void refreshCart() {
         cartModel.setRowCount(0);
+        double total = 0.0;
 
-        double total = 0;
         for (Map.Entry<Product, Integer> entry : cart.entrySet()) {
             Product p = entry.getKey();
             int qty = entry.getValue();
-
-            double lineTotal = p.getPrice() * qty * (1 + p.getVatRate() / 100);
+            double lineTotal = p.getPrice() * qty * (1 + p.getVatRate() / 100.0);
             total += lineTotal;
 
             cartModel.addRow(new Object[]{
@@ -454,29 +393,11 @@ public class SalesPanel extends JPanel {
 
     private void clearCart() {
         cart.clear();
-
-        if (cartModel != null) {
-            cartModel.setRowCount(0);
-        }
-
-        if (totalLabel != null) {
-            totalLabel.setText("Total: £0.00");
-        }
-
         selectedCustomer = null;
-
-        if (customerLabel != null) {
-            customerLabel.setText("No customer selected");
-        }
-
-        if (occasionalBtn != null) {
-            occasionalBtn.setSelected(true);
-        }
-
-        if (paymentCombo != null) {
-            paymentCombo.setModel(new DefaultComboBoxModel<>(new String[]{"CASH", "CARD"}));
-            styleCombo(paymentCombo);
-        }
+        customerSelectedLabel.setText("No customer selected");
+        occasionalCustomerRadio.setSelected(true);
+        selectCustomerBtn.setEnabled(false);
+        refreshCart();
     }
 
     private void confirmSale() {
@@ -485,19 +406,31 @@ public class SalesPanel extends JPanel {
             return;
         }
 
-        boolean isAccount = accountBtn.isSelected();
-
-        if (isAccount && selectedCustomer == null) {
+        boolean accountSale = accountHolderRadio.isSelected();
+        if (accountSale && selectedCustomer == null) {
             JOptionPane.showMessageDialog(this, "Please select an account holder.");
             return;
         }
 
-        String saleType = isAccount ? "ACCOUNT" : "OCCASIONAL";
-        String paymentMethod = (String) paymentCombo.getSelectedItem();
-        int userId = Session.getCurrentUser().getUserId();
+        JComboBox<String> paymentMethodCombo = new JComboBox<>(
+                accountSale ? new String[]{"CARD", "CREDIT_ACCOUNT"} : new String[]{"CASH", "CARD"}
+        );
+
+        int choice = JOptionPane.showConfirmDialog(
+                this,
+                new Object[]{"Payment Method:", paymentMethodCombo},
+                "Confirm Sale",
+                JOptionPane.OK_CANCEL_OPTION
+        );
+        if (choice != JOptionPane.OK_OPTION) {
+            return;
+        }
+
+        String saleType = accountSale ? "ACCOUNT" : "OCCASIONAL";
+        String paymentMethod = (String) paymentMethodCombo.getSelectedItem();
 
         int saleId = SaleDB.recordSale(
-                userId,
+                Session.getUserId(),
                 selectedCustomer,
                 saleType,
                 paymentMethod,
@@ -510,69 +443,169 @@ public class SalesPanel extends JPanel {
             return;
         }
 
-        String docNumber;
-        if (isAccount) {
+        String documentNumber;
+        if (accountSale) {
             double total = cart.entrySet().stream()
-                    .mapToDouble(e -> e.getKey().getPrice() * e.getValue()
-                            * (1 + e.getKey().getVatRate() / 100))
+                    .mapToDouble(e -> e.getKey().getPrice() * e.getValue() * (1 + e.getKey().getVatRate() / 100.0))
                     .sum();
 
-            docNumber = SaleDB.generateInvoice(
-                    saleId,
-                    selectedCustomer.getCustomerId(),
-                    total
-            );
-
-            JOptionPane.showMessageDialog(
-                    this,
-                    "Sale recorded.\nInvoice: " + docNumber
-                            + "\nCustomer: " + selectedCustomer.getFullName()
-            );
+            documentNumber = SaleDB.generateInvoice(saleId, selectedCustomer.getCustomerId(), total);
+            JOptionPane.showMessageDialog(this,
+                    "Sale recorded.\nInvoice: " + documentNumber + "\nCustomer: " + selectedCustomer.getFullName());
         } else {
-            docNumber = SaleDB.generateReceipt(saleId);
-
-            JOptionPane.showMessageDialog(
-                    this,
-                    "Sale recorded.\nReceipt: " + docNumber
-            );
+            documentNumber = SaleDB.generateReceipt(saleId);
+            JOptionPane.showMessageDialog(this, "Sale recorded.\nReceipt: " + documentNumber);
         }
 
-        loadCatalogue();
         clearCart();
+        loadCatalogue();
     }
 
-    private void applyPanelTheme(JComponent c) {
-        c.setBackground(ThemeManager.innerCardBackground());
-        c.setForeground(ThemeManager.textPrimary());
-        c.setBorder(BorderFactory.createCompoundBorder(
+    private void setControlSize(JComponent component, int width, int height) {
+        Dimension size = new Dimension(width, height);
+        component.setPreferredSize(size);
+        component.setMinimumSize(size);
+    }
+
+    private void configureTable(JTable table) {
+        table.setRowHeight(52);
+        table.setShowGrid(true);
+        table.setIntercellSpacing(new Dimension(1, 1));
+        table.setFillsViewportHeight(true);
+        table.setBorder(BorderFactory.createEmptyBorder());
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.setDefaultEditor(Object.class, null);
+        table.setFont(new Font("SansSerif", Font.PLAIN, 13));
+
+        JTableHeader header = table.getTableHeader();
+        header.setReorderingAllowed(false);
+        header.setFont(new Font("SansSerif", Font.BOLD, 14));
+        header.setPreferredSize(new Dimension(header.getPreferredSize().width, 34));
+        header.setBorder(BorderFactory.createEmptyBorder());
+
+        DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
+        renderer.setHorizontalAlignment(SwingConstants.LEFT);
+        renderer.setBorder(new EmptyBorder(0, 12, 0, 12));
+        table.setDefaultRenderer(Object.class, renderer);
+    }
+
+    private void styleScrollPane(JScrollPane sp) {
+        sp.setBorder(BorderFactory.createEmptyBorder());
+        sp.setOpaque(true);
+        sp.setBackground(ThemeManager.tableBackground());
+        sp.getViewport().setBackground(ThemeManager.tableBackground());
+        sp.getViewport().setBorder(null);
+
+        if (sp.getVerticalScrollBar() != null) {
+            sp.getVerticalScrollBar().setBackground(ThemeManager.panelBackground());
+            sp.getVerticalScrollBar().setBorder(BorderFactory.createEmptyBorder());
+        }
+        if (sp.getHorizontalScrollBar() != null) {
+            sp.getHorizontalScrollBar().setBackground(ThemeManager.panelBackground());
+            sp.getHorizontalScrollBar().setBorder(BorderFactory.createEmptyBorder());
+        }
+    }
+
+    private void applyTableTheme(JTable table) {
+        table.setBackground(ThemeManager.tableBackground());
+        table.setForeground(ThemeManager.textPrimary());
+        table.setGridColor(ThemeManager.tableGrid());
+        table.setSelectionBackground(ThemeManager.selectionBackground());
+        table.setSelectionForeground(ThemeManager.textPrimary());
+
+        JTableHeader header = table.getTableHeader();
+        if (header != null) {
+            header.setBackground(ThemeManager.tableHeaderBackground());
+            header.setForeground(ThemeManager.textPrimary());
+            header.setBorder(BorderFactory.createEmptyBorder());
+            header.setOpaque(true);
+        }
+
+        DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
+        renderer.setBackground(ThemeManager.tableBackground());
+        renderer.setForeground(ThemeManager.textPrimary());
+        renderer.setHorizontalAlignment(SwingConstants.LEFT);
+        renderer.setBorder(new EmptyBorder(0, 12, 0, 12));
+        table.setDefaultRenderer(Object.class, renderer);
+    }
+
+    private void stylePrimaryButton(JButton button) {
+        button.setFocusPainted(false);
+        button.setOpaque(true);
+        button.setFont(new Font("SansSerif", Font.BOLD, 14));
+        button.setBackground(ThemeManager.buttonDark());
+        button.setForeground(ThemeManager.textLight());
+        button.setBorder(BorderFactory.createEmptyBorder(10, 18, 10, 18));
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    }
+
+    private void styleSecondaryButton(JButton button) {
+        button.setFocusPainted(false);
+        button.setOpaque(true);
+        button.setFont(new Font("SansSerif", Font.BOLD, 14));
+        button.setBackground(ThemeManager.buttonLight());
+        button.setForeground(ThemeManager.textPrimary());
+        button.setBorder(BorderFactory.createLineBorder(ThemeManager.borderColor()));
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    }
+
+    private void styleCombo(JComboBox<String> comboBox) {
+        comboBox.setFocusable(false);
+        comboBox.setOpaque(true);
+        comboBox.setBackground(ThemeManager.comboBackground());
+        comboBox.setForeground(ThemeManager.comboForeground());
+        comboBox.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        comboBox.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(ThemeManager.borderColor()),
-                new EmptyBorder(12, 12, 12, 12)
+                new EmptyBorder(0, 8, 0, 8)
         ));
     }
 
-    private void styleTable(JTable table) {
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        table.setRowHeight(38);
-        table.setShowGrid(false);
-        table.setIntercellSpacing(new Dimension(0, 0));
-        table.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        table.setBackground(ThemeManager.tableBackground());
-        table.setForeground(ThemeManager.textPrimary());
-        table.setSelectionBackground(ThemeManager.selectionBackground());
-        table.setSelectionForeground(ThemeManager.textPrimary());
-        table.setGridColor(ThemeManager.tableGrid());
-
-        table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
-        table.getTableHeader().setBackground(ThemeManager.tableHeaderBackground());
-        table.getTableHeader().setForeground(ThemeManager.textPrimary());
-        table.getTableHeader().setReorderingAllowed(false);
+    private void styleRadio(JRadioButton radioButton) {
+        radioButton.setOpaque(false);
+        radioButton.setForeground(ThemeManager.textPrimary());
+        radioButton.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        radioButton.setFocusPainted(false);
+        radioButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     }
 
-    private JScrollPane themedScrollPane(JTable table) {
-        JScrollPane scrollPane = new JScrollPane(table);
-        scrollPane.setBorder(BorderFactory.createLineBorder(ThemeManager.borderColor()));
-        scrollPane.getViewport().setBackground(ThemeManager.tableBackground());
-        scrollPane.setBackground(ThemeManager.tableBackground());
-        return scrollPane;
+    @Override
+    public void applyTheme() {
+        setBackground(ThemeManager.appBackground());
+
+        if (contentPanel != null) contentPanel.setBackground(ThemeManager.appBackground());
+        if (centerSection != null) centerSection.setBackground(ThemeManager.appBackground());
+        if (leftCard != null) leftCard.setBackground(ThemeManager.panelBackground());
+        if (rightCard != null) rightCard.setBackground(ThemeManager.panelBackground());
+        if (topControls != null) topControls.setBackground(ThemeManager.appBackground());
+        if (bottomControls != null) bottomControls.setBackground(ThemeManager.appBackground());
+
+        if (availableProductsLabel != null) availableProductsLabel.setForeground(ThemeManager.textPrimary());
+        if (currentCartLabel != null) currentCartLabel.setForeground(ThemeManager.textPrimary());
+        if (saleTypeLabel != null) saleTypeLabel.setForeground(ThemeManager.textPrimary());
+        if (customerSelectedLabel != null) customerSelectedLabel.setForeground(ThemeManager.textSecondary());
+        if (totalLabel != null) totalLabel.setForeground(ThemeManager.textPrimary());
+
+        if (productsTable != null) applyTableTheme(productsTable);
+        if (cartTable != null) applyTableTheme(cartTable);
+
+        if (productsScrollPane != null) styleScrollPane(productsScrollPane);
+        if (cartScrollPane != null) styleScrollPane(cartScrollPane);
+
+        if (addToCartBtn != null) stylePrimaryButton(addToCartBtn);
+        if (confirmSaleBtn != null) stylePrimaryButton(confirmSaleBtn);
+
+        if (removeItemBtn != null) styleSecondaryButton(removeItemBtn);
+        if (selectCustomerBtn != null) styleSecondaryButton(selectCustomerBtn);
+        if (clearCartBtn != null) styleSecondaryButton(clearCartBtn);
+
+        if (filterCombo != null) styleCombo(filterCombo);
+        if (sortCombo != null) styleCombo(sortCombo);
+
+        if (accountHolderRadio != null) styleRadio(accountHolderRadio);
+        if (occasionalCustomerRadio != null) styleRadio(occasionalCustomerRadio);
+
+        repaint();
+        revalidate();
     }
 }
