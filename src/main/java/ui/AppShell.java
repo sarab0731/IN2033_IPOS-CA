@@ -25,6 +25,9 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
     private JLabel userNameLabel;
     private JLabel logoLabel;
 
+    private JButton toggleThemeBtn;
+    private JButton logoutBtn;
+
     private final Map<String, JButton> navButtons = new LinkedHashMap<>();
 
     public AppShell(ScreenRouter router, String activeScreen, String heading, String subheading, JComponent content) {
@@ -96,17 +99,14 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         JLabel help = new JLabel("Help");
         JLabel contact = new JLabel("Contact us");
 
-        JButton toggleThemeBtn = createNavButton("Toggle Theme");
-        toggleThemeBtn.addActionListener(e -> ThemeManager.toggleTheme());
+        help.setAlignmentX(Component.LEFT_ALIGNMENT);
+        contact.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JButton logoutBtn = createNavButton("Log out");
-        logoutBtn.addActionListener(e -> {
+        toggleThemeBtn = createSidebarButton("Toggle Theme", ThemeManager::toggleTheme);
+        logoutBtn = createSidebarButton("Log out", () -> {
             Session.logout();
             router.goTo(MainFrame.SCREEN_LOGIN);
         });
-
-        help.setAlignmentX(Component.LEFT_ALIGNMENT);
-        contact.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         bottom.add(help);
         bottom.add(Box.createVerticalStrut(14));
@@ -217,6 +217,45 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         return btn;
     }
 
+    private JButton createSidebarButton(String text, Runnable action) {
+        JButton btn = new JButton(text);
+        btn.setAlignmentX(Component.LEFT_ALIGNMENT);
+        btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 48));
+        btn.setPreferredSize(new Dimension(140, 48));
+        btn.setHorizontalAlignment(SwingConstants.LEFT);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setContentAreaFilled(true);
+        btn.setOpaque(true);
+        btn.setFont(new Font("SansSerif", Font.BOLD, 14));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setBorder(new EmptyBorder(10, 16, 10, 16));
+
+        applySidebarButtonTheme(btn);
+
+        btn.addActionListener(e -> action.run());
+
+        btn.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                btn.setBackground(ThemeManager.sidebarHover());
+                btn.setForeground(ThemeManager.textLight());
+            }
+
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                applySidebarButtonTheme(btn);
+            }
+        });
+
+        return btn;
+    }
+
+    private void applySidebarButtonTheme(JButton btn) {
+        btn.setBackground(ThemeManager.sidebarBackground());
+        btn.setForeground(ThemeManager.textSecondary());
+    }
+
     private void highlightActiveButton() {
         for (Map.Entry<String, JButton> entry : navButtons.entrySet()) {
             JButton btn = entry.getValue();
@@ -295,6 +334,7 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
             sidebar.setBackground(ThemeManager.sidebarBackground());
             JLabel help = (JLabel) sidebar.getClientProperty("helpLabel");
             JLabel contact = (JLabel) sidebar.getClientProperty("contactLabel");
+
             if (help != null) {
                 help.setForeground(ThemeManager.textSecondary());
             }
@@ -330,6 +370,7 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         if (searchField != null) {
             searchField.setBackground(ThemeManager.searchBackground());
             searchField.setForeground(ThemeManager.textPrimary());
+            searchField.setCaretColor(ThemeManager.textPrimary());
             searchField.setBorder(BorderFactory.createCompoundBorder(
                     BorderFactory.createLineBorder(ThemeManager.borderColor()),
                     new EmptyBorder(6, 12, 6, 12)
@@ -338,6 +379,14 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
 
         if (userNameLabel != null) {
             userNameLabel.setForeground(ThemeManager.textPrimary());
+        }
+
+        if (toggleThemeBtn != null) {
+            applySidebarButtonTheme(toggleThemeBtn);
+        }
+
+        if (logoutBtn != null) {
+            applySidebarButtonTheme(logoutBtn);
         }
 
         setLogo();
