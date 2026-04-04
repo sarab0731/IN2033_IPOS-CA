@@ -1,4 +1,3 @@
-
 package ui;
 
 import database.ProductDB;
@@ -48,6 +47,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
 
     private DefaultTableModel productsModel;
     private DefaultTableModel summaryModel;
+
     private final Map<Product, Integer> cart = new LinkedHashMap<>();
 
     public OrdersPanel(ScreenRouter router) {
@@ -73,14 +73,14 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
     private JPanel buildContent() {
         contentPanel = new JPanel(new BorderLayout(20, 20));
         contentPanel.setBorder(new EmptyBorder(8, 8, 8, 8));
+        contentPanel.setOpaque(true);
 
         topTabBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 18, 0));
         topTabBar.setOpaque(false);
 
-        placeNewOrderTab = new JButton("Place New Order");
-        orderHistoryTab = new JButton("Order History");
-        placeNewOrderTab.setFocusable(false);
-        orderHistoryTab.setFocusable(false);
+        placeNewOrderTab = createRestockStyleButton("Place New Order", false);
+        orderHistoryTab = createRestockStyleButton("Order History", false);
+
         topTabBar.add(placeNewOrderTab);
         topTabBar.add(orderHistoryTab);
 
@@ -90,8 +90,8 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         JPanel leftButtons = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
         leftButtons.setOpaque(false);
 
-        addToOrderBtn = new JButton("+  Add To Order");
-        removeItemBtn = new JButton("Remove Item");
+        addToOrderBtn = createRestockStyleButton("+  Add To Order", true);
+        removeItemBtn = createRestockStyleButton("Remove Item", false);
 
         leftButtons.add(addToOrderBtn);
         leftButtons.add(removeItemBtn);
@@ -128,14 +128,20 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         productsModel = new DefaultTableModel(
                 new String[]{"ID", "Item ID", "Description", "Price £", "Stock", "Min Stock"}, 0
         ) {
-            @Override public boolean isCellEditable(int row, int col) { return false; }
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
         };
         productsTable = new JTable(productsModel);
 
         summaryModel = new DefaultTableModel(
                 new String[]{"Description", "Qty", "Unit Cost £", "Line Total £"}, 0
         ) {
-            @Override public boolean isCellEditable(int row, int col) { return false; }
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
         };
         summaryTable = new JTable(summaryModel);
 
@@ -171,8 +177,8 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         bottomBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
         bottomBar.setOpaque(false);
 
-        clearOrderBtn = new JButton("Clear Order");
-        placeOrderBtn = new JButton("Place Order");
+        clearOrderBtn = createRestockStyleButton("Clear Order", false);
+        placeOrderBtn = createRestockStyleButton("Place Order", true);
 
         bottomBar.add(clearOrderBtn);
         bottomBar.add(placeOrderBtn);
@@ -195,10 +201,9 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         clearOrderBtn.addActionListener(e -> clearOrder());
         placeOrderBtn.addActionListener(e -> placeOrder());
 
-        placeNewOrderTab.addActionListener(e -> JOptionPane.showMessageDialog(
-                this,
-                "You are already on Place New Order."
-        ));
+        placeNewOrderTab.addActionListener(e ->
+                JOptionPane.showMessageDialog(this, "You are already on Place New Order.")
+        );
 
         orderHistoryTab.addActionListener(e -> showOrderHistoryDialog());
 
@@ -213,6 +218,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
     private void loadCatalogue() {
         productsModel.setRowCount(0);
         List<Product> products = ProductDB.getAllProducts();
+
         for (Product p : products) {
             productsModel.addRow(new Object[]{
                     p.getProductId(),
@@ -232,16 +238,25 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
             return;
         }
 
-        int productId = (int) productsModel.getValueAt(row, 0);
+        int modelRow = productsTable.convertRowIndexToModel(row);
+        int productId = (int) productsModel.getValueAt(modelRow, 0);
         Product product = ProductDB.getById(productId);
-        if (product == null) return;
+
+        if (product == null) {
+            JOptionPane.showMessageDialog(this, "Could not load the selected product.");
+            return;
+        }
 
         String input = JOptionPane.showInputDialog(this, "Quantity to order:");
-        if (input == null || input.trim().isEmpty()) return;
+        if (input == null || input.trim().isEmpty()) {
+            return;
+        }
 
         try {
             int qty = Integer.parseInt(input.trim());
-            if (qty <= 0) throw new NumberFormatException();
+            if (qty <= 0) {
+                throw new NumberFormatException();
+            }
 
             cart.merge(product, qty, Integer::sum);
             refreshSummary();
@@ -257,7 +272,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
             return;
         }
 
-        Product key = (Product) cart.keySet().toArray()[row];
+        Product key = (Product) cart.keySet().toArray()[summaryTable.convertRowIndexToModel(row)];
         cart.remove(key);
         refreshSummary();
     }
@@ -299,12 +314,15 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
             return;
         }
 
-        merchantIdValue.setText(merchantId.trim());
-        String orderNumber = RestockOrderDB.placeOrder(merchantId.trim(), cart);
+        merchantId = merchantId.trim();
+        merchantIdValue.setText(merchantId);
+
+        String orderNumber = RestockOrderDB.placeOrder(merchantId, cart);
 
         if (orderNumber != null) {
             JOptionPane.showMessageDialog(this, "Order placed successfully.\nOrder number: " + orderNumber);
             clearOrder();
+            loadCatalogue();
         } else {
             JOptionPane.showMessageDialog(this, "Failed to place order.");
         }
@@ -314,32 +332,46 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         DefaultTableModel historyModel = new DefaultTableModel(
                 new String[]{"ID", "Order Number", "Merchant ID", "Status", "Total £", "Created At"}, 0
         ) {
-            @Override public boolean isCellEditable(int row, int col) { return false; }
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
         };
 
         JTable historyTable = new JTable(historyModel);
         configureTable(historyTable);
+        applyTableTheme(historyTable);
+
+        JScrollPane historyScroll = new JScrollPane(historyTable);
+        styleScrollPane(historyScroll);
+
         loadOrderHistory(historyModel);
 
-        JButton refreshHistoryBtn = new JButton("Refresh");
-        JButton updateStatusBtn = new JButton("Update Status");
-        styleSecondaryButton(refreshHistoryBtn);
-        stylePrimaryButton(updateStatusBtn);
+        JButton refreshHistoryBtn = createRestockStyleButton("Refresh", false);
+        JButton updateStatusBtn = createRestockStyleButton("Update Status", true);
 
         JPanel panel = new JPanel(new BorderLayout(12, 12));
-        panel.add(new JScrollPane(historyTable), BorderLayout.CENTER);
+        panel.setBorder(new EmptyBorder(12, 12, 12, 12));
+        panel.setBackground(ThemeManager.panelBackground());
+        panel.add(historyScroll, BorderLayout.CENTER);
 
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        buttons.setOpaque(false);
         buttons.add(refreshHistoryBtn);
         buttons.add(updateStatusBtn);
         panel.add(buttons, BorderLayout.SOUTH);
 
-        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Order History", Dialog.ModalityType.APPLICATION_MODAL);
+        JDialog dialog = new JDialog(
+                SwingUtilities.getWindowAncestor(this),
+                "Order History",
+                Dialog.ModalityType.APPLICATION_MODAL
+        );
         dialog.setContentPane(panel);
         dialog.setSize(850, 420);
         dialog.setLocationRelativeTo(this);
 
         refreshHistoryBtn.addActionListener(e -> loadOrderHistory(historyModel));
+
         updateStatusBtn.addActionListener(e -> {
             int row = historyTable.getSelectedRow();
             if (row == -1) {
@@ -347,8 +379,9 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
                 return;
             }
 
-            int orderId = (int) historyModel.getValueAt(row, 0);
-            String currentStatus = String.valueOf(historyModel.getValueAt(row, 3));
+            int modelRow = historyTable.convertRowIndexToModel(row);
+            int orderId = (int) historyModel.getValueAt(modelRow, 0);
+            String currentStatus = String.valueOf(historyModel.getValueAt(modelRow, 3));
             String nextStatus = getNextStatus(currentStatus);
 
             if (nextStatus == null) {
@@ -375,6 +408,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
 
     private void loadOrderHistory(DefaultTableModel historyModel) {
         historyModel.setRowCount(0);
+
         for (RestockOrder order : RestockOrderDB.getAllOrders()) {
             historyModel.addRow(new Object[]{
                     order.getRestockOrderId(),
@@ -447,22 +481,77 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         table.setDefaultRenderer(Object.class, renderer);
     }
 
-    private void stylePrimaryButton(JButton button) {
+    private JButton createRestockStyleButton(String text, boolean primary) {
+        JButton button = new RoundedButton(text);
         button.setFocusPainted(false);
-        button.setOpaque(true);
-        button.setBorder(BorderFactory.createEmptyBorder(10, 18, 10, 18));
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         button.setFont(new Font("SansSerif", Font.BOLD, 13));
-        button.setBackground(ThemeManager.buttonDark());
-        button.setForeground(ThemeManager.textLight());
+        button.setHorizontalAlignment(SwingConstants.CENTER);
+        button.setContentAreaFilled(false);
+        button.setOpaque(false);
+        button.setMargin(new Insets(0, 0, 0, 0));
+        button.setBorder(BorderFactory.createEmptyBorder(12, 22, 12, 22));
+
+        if (primary) {
+            button.setBackground(ThemeManager.buttonDark());
+            button.setForeground(ThemeManager.textLight());
+            button.putClientProperty("outlineColor", ThemeManager.buttonDark());
+        } else {
+            button.setBackground(ThemeManager.buttonLight());
+            button.setForeground(ThemeManager.textPrimary());
+            button.putClientProperty("outlineColor", ThemeManager.borderColor());
+        }
+
+        return button;
     }
 
-    private void styleSecondaryButton(JButton button) {
-        button.setFocusPainted(false);
-        button.setOpaque(true);
-        button.setBorder(BorderFactory.createLineBorder(ThemeManager.borderColor()));
-        button.setFont(new Font("SansSerif", Font.BOLD, 13));
-        button.setBackground(ThemeManager.buttonLight());
-        button.setForeground(ThemeManager.textPrimary());
+    private static class RoundedButton extends JButton {
+        public RoundedButton(String text) {
+            super(text);
+            setContentAreaFilled(false);
+            setFocusPainted(false);
+            setBorderPainted(false);
+            setOpaque(false);
+            setRolloverEnabled(true);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            Color fill = getBackground();
+            if (getModel().isPressed()) {
+                fill = fill.darker();
+            } else if (getModel().isRollover()) {
+                fill = adjust(fill, 8);
+            }
+
+            g2.setColor(fill);
+            g2.fillRoundRect(0, 0, getWidth(), getHeight(), 26, 26);
+            g2.dispose();
+
+            super.paintComponent(g);
+        }
+
+        @Override
+        protected void paintBorder(Graphics g) {
+            Object value = getClientProperty("outlineColor");
+            Color outline = value instanceof Color ? (Color) value : new Color(210, 210, 210);
+
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(outline);
+            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 26, 26);
+            g2.dispose();
+        }
+
+        private Color adjust(Color c, int amount) {
+            int r = Math.min(255, c.getRed() + amount);
+            int g = Math.min(255, c.getGreen() + amount);
+            int b = Math.min(255, c.getBlue() + amount);
+            return new Color(r, g, b, c.getAlpha());
+        }
     }
 
     @Override
@@ -473,12 +562,14 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         if (topTabBar != null) topTabBar.setBackground(ThemeManager.appBackground());
         if (controlsPanel != null) controlsPanel.setBackground(ThemeManager.appBackground());
         if (bottomBar != null) bottomBar.setBackground(ThemeManager.appBackground());
+
         if (leftCard != null) leftCard.setBackground(ThemeManager.panelBackground());
         if (rightCard != null) rightCard.setBackground(ThemeManager.panelBackground());
 
         if (availableProductsLabel != null) availableProductsLabel.setForeground(ThemeManager.textPrimary());
         if (orderSummaryLabel != null) orderSummaryLabel.setForeground(ThemeManager.textPrimary());
         if (merchantIdLabel != null) merchantIdLabel.setForeground(ThemeManager.textPrimary());
+
         if (merchantIdValue != null) {
             merchantIdValue.setForeground(ThemeManager.textPrimary());
             merchantIdValue.setBackground(ThemeManager.fieldBackground());
@@ -488,6 +579,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
                     new EmptyBorder(10, 14, 10, 14)
             ));
         }
+
         if (totalLabel != null) totalLabel.setForeground(ThemeManager.textPrimary());
 
         if (productsTable != null) applyTableTheme(productsTable);
@@ -495,14 +587,30 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         if (productsScrollPane != null) styleScrollPane(productsScrollPane);
         if (summaryScrollPane != null) styleScrollPane(summaryScrollPane);
 
-        if (placeNewOrderTab != null) styleSecondaryButton(placeNewOrderTab);
-        if (orderHistoryTab != null) styleSecondaryButton(orderHistoryTab);
-        if (addToOrderBtn != null) stylePrimaryButton(addToOrderBtn);
-        if (placeOrderBtn != null) stylePrimaryButton(placeOrderBtn);
-        if (removeItemBtn != null) styleSecondaryButton(removeItemBtn);
-        if (clearOrderBtn != null) styleSecondaryButton(clearOrderBtn);
+        restyleButton(addToOrderBtn, true);
+        restyleButton(removeItemBtn, false);
+        restyleButton(clearOrderBtn, false);
+        restyleButton(placeOrderBtn, true);
+        restyleButton(placeNewOrderTab, false);
+        restyleButton(orderHistoryTab, false);
 
         repaint();
         revalidate();
+    }
+
+    private void restyleButton(JButton button, boolean primary) {
+        if (button == null) {
+            return;
+        }
+
+        if (primary) {
+            button.setBackground(ThemeManager.buttonDark());
+            button.setForeground(ThemeManager.textLight());
+            button.putClientProperty("outlineColor", ThemeManager.buttonDark());
+        } else {
+            button.setBackground(ThemeManager.buttonLight());
+            button.setForeground(ThemeManager.textPrimary());
+            button.putClientProperty("outlineColor", ThemeManager.borderColor());
+        }
     }
 }
