@@ -9,6 +9,8 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -320,42 +322,31 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
     }
 
     private void showAddDialog() {
-        JTextField itemIdField = new JTextField();
-        JTextField descField = new JTextField();
-        JTextField pkgField = new JTextField();
-        JTextField unitsField = new JTextField("1");
-        JTextField priceField = new JTextField();
-        JTextField vatField = new JTextField("0.00");
-        JTextField stockField = new JTextField("0");
-        JTextField minStockField = new JTextField("5");
+        Window window = SwingUtilities.getWindowAncestor(this);
+        ProductFormDialog dialog = new ProductFormDialog(
+                window,
+                "Order / Add Stock",
+                true,
+                null
+        );
 
-        Object[] fields = {
-                "Item ID:", itemIdField,
-                "Description:", descField,
-                "Package Type:", pkgField,
-                "Units in Pack:", unitsField,
-                "Price £:", priceField,
-                "VAT %:", vatField,
-                "Stock Quantity:", stockField,
-                "Minimum Stock:", minStockField
-        };
+        dialog.setVisible(true);
 
-        int result = JOptionPane.showConfirmDialog(this, fields, "Order / Add Stock", JOptionPane.OK_CANCEL_OPTION);
-        if (result != JOptionPane.OK_OPTION) {
+        if (!dialog.isConfirmed()) {
             return;
         }
 
         try {
             Product product = new Product(
                     0,
-                    itemIdField.getText().trim(),
-                    descField.getText().trim(),
-                    pkgField.getText().trim(),
-                    Integer.parseInt(unitsField.getText().trim()),
-                    Double.parseDouble(priceField.getText().trim()),
-                    Double.parseDouble(vatField.getText().trim()),
-                    Integer.parseInt(stockField.getText().trim()),
-                    Integer.parseInt(minStockField.getText().trim())
+                    dialog.getItemId(),
+                    dialog.getDescriptionText(),
+                    dialog.getPackageType(),
+                    dialog.getUnitsInPack(),
+                    dialog.getPrice(),
+                    dialog.getVatRate(),
+                    dialog.getStockQuantity(),
+                    dialog.getMinimumStock()
             );
 
             if (ProductDB.addProduct(product)) {
@@ -375,37 +366,28 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
             return;
         }
 
-        JTextField descField = new JTextField(freshProduct.getDescription());
-        JTextField pkgField = new JTextField(freshProduct.getPackageType());
-        JTextField unitsField = new JTextField(String.valueOf(freshProduct.getUnitsInPack()));
-        JTextField priceField = new JTextField(String.format("%.2f", freshProduct.getPrice()));
-        JTextField vatField = new JTextField(String.format("%.2f", freshProduct.getVatRate()));
-        JTextField stockField = new JTextField(String.valueOf(freshProduct.getStockQuantity()));
-        JTextField minStockField = new JTextField(String.valueOf(freshProduct.getMinStockLevel()));
+        Window window = SwingUtilities.getWindowAncestor(this);
+        ProductFormDialog dialog = new ProductFormDialog(
+                window,
+                "Edit Product",
+                false,
+                freshProduct
+        );
 
-        Object[] fields = {
-                "Description:", descField,
-                "Package Type:", pkgField,
-                "Units in Pack:", unitsField,
-                "Price £:", priceField,
-                "VAT %:", vatField,
-                "Stock Quantity:", stockField,
-                "Minimum Stock:", minStockField
-        };
+        dialog.setVisible(true);
 
-        int result = JOptionPane.showConfirmDialog(this, fields, "Edit Product", JOptionPane.OK_CANCEL_OPTION);
-        if (result != JOptionPane.OK_OPTION) {
+        if (!dialog.isConfirmed()) {
             return;
         }
 
         try {
-            freshProduct.setDescription(descField.getText().trim());
-            freshProduct.setPackageType(pkgField.getText().trim());
-            freshProduct.setUnitsInPack(Integer.parseInt(unitsField.getText().trim()));
-            freshProduct.setPrice(Double.parseDouble(priceField.getText().trim()));
-            freshProduct.setVatRate(Double.parseDouble(vatField.getText().trim()));
-            freshProduct.setStockQuantity(Integer.parseInt(stockField.getText().trim()));
-            freshProduct.setMinStockLevel(Integer.parseInt(minStockField.getText().trim()));
+            freshProduct.setDescription(dialog.getDescriptionText());
+            freshProduct.setPackageType(dialog.getPackageType());
+            freshProduct.setUnitsInPack(dialog.getUnitsInPack());
+            freshProduct.setPrice(dialog.getPrice());
+            freshProduct.setVatRate(dialog.getVatRate());
+            freshProduct.setStockQuantity(dialog.getStockQuantity());
+            freshProduct.setMinStockLevel(dialog.getMinimumStock());
 
             if (ProductDB.updateProduct(freshProduct)) {
                 loadTable();
@@ -626,5 +608,235 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
             setText(status);
             return this;
         }
+    }
+
+    private static class RoundedDarkButtonUI extends javax.swing.plaf.basic.BasicButtonUI {
+        @Override
+        public void installUI(JComponent c) {
+            super.installUI(c);
+            JButton button = (JButton) c;
+            button.setOpaque(false);
+            button.setBorder(BorderFactory.createEmptyBorder(14, 40, 14, 40));
+            button.setRolloverEnabled(true);
+        }
+
+        @Override
+        public void paint(Graphics g, JComponent c) {
+            JButton button = (JButton) c;
+            Graphics2D g2 = (Graphics2D) g.create();
+
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            ButtonModel model = button.getModel();
+
+            Color backgroundColor;
+            if (model.isPressed()) {
+                backgroundColor = new Color(22, 24, 33);
+            } else if (model.isRollover()) {
+                backgroundColor = new Color(30, 32, 43);
+            } else {
+                backgroundColor = new Color(27, 29, 39);
+            }
+
+            int arc = c.getHeight();
+            g2.setColor(backgroundColor);
+            g2.fillRoundRect(0, 0, c.getWidth(), c.getHeight(), arc, arc);
+
+            FontMetrics fm = g2.getFontMetrics(button.getFont());
+            String text = button.getText();
+            int textX = (c.getWidth() - fm.stringWidth(text)) / 2;
+            int textY = (c.getHeight() - fm.getHeight()) / 2 + fm.getAscent();
+
+            g2.setFont(button.getFont());
+            g2.setColor(button.getForeground());
+            g2.drawString(text, textX, textY);
+
+            g2.dispose();
+        }
+    }
+
+    private static class ProductFormDialog extends JDialog {
+
+        private final boolean addMode;
+        private boolean confirmed = false;
+
+        private JTextField itemIdField;
+        private JTextField descField;
+        private JTextField pkgField;
+        private JTextField unitsField;
+        private JTextField priceField;
+        private JTextField vatField;
+        private JTextField stockField;
+        private JTextField minStockField;
+
+        ProductFormDialog(Window owner, String title, boolean addMode, Product product) {
+            super(owner, title, ModalityType.APPLICATION_MODAL);
+            this.addMode = addMode;
+
+            setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+            setResizable(false);
+            setContentPane(buildUI(product));
+            pack();
+            setSize(520, 780);
+            setLocationRelativeTo(owner);
+        }
+
+        private JPanel buildUI(Product product) {
+            JPanel root = new JPanel(new GridBagLayout());
+            root.setBackground(ThemeManager.appBackground());
+            root.setBorder(new EmptyBorder(16, 16, 16, 16));
+
+            JPanel card = new JPanel(new GridBagLayout());
+            card.setBackground(ThemeManager.panelBackground());
+            card.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(ThemeManager.borderColor()),
+                    new EmptyBorder(20, 24, 20, 24)
+            ));
+
+            GridBagConstraints c = new GridBagConstraints();
+            c.gridx = 0;
+            c.gridy = 0;
+            c.weightx = 1.0;
+            c.fill = GridBagConstraints.HORIZONTAL;
+
+            // Title
+            JLabel titleLabel = new JLabel("Order / Add Stock");
+            titleLabel.setFont(new Font("SansSerif", Font.BOLD, 28));
+            titleLabel.setForeground(ThemeManager.textPrimary());
+            c.insets = new Insets(0, 0, 10, 0);
+            card.add(titleLabel, c);
+
+            // Subtitle
+            c.gridy++;
+            JLabel subtitleLabel = new JLabel("Enter the product details below to add new stock.");
+            subtitleLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
+            subtitleLabel.setForeground(ThemeManager.textSecondary());
+            c.insets = new Insets(0, 0, 16, 0);
+            card.add(subtitleLabel, c);
+
+            // Fields
+            itemIdField = createField();
+            descField = createField();
+            pkgField = createField();
+            unitsField = createField();
+            priceField = createField();
+            vatField = createField();
+            stockField = createField();
+            minStockField = createField();
+
+            if (product == null) {
+                unitsField.setText("1");
+                vatField.setText("0.00");
+                stockField.setText("0");
+                minStockField.setText("5");
+            } else {
+                itemIdField.setText(product.getItemId());
+                descField.setText(product.getDescription());
+                pkgField.setText(product.getPackageType());
+                unitsField.setText(String.valueOf(product.getUnitsInPack()));
+                priceField.setText(String.format("%.2f", product.getPrice()));
+                vatField.setText(String.format("%.2f", product.getVatRate()));
+                stockField.setText(String.valueOf(product.getStockQuantity()));
+                minStockField.setText(String.valueOf(product.getMinStockLevel()));
+                itemIdField.setEnabled(false);
+            }
+
+            addField(card, c, "Item ID", itemIdField);
+            addField(card, c, "Description", descField);
+            addField(card, c, "Package Type", pkgField);
+            addField(card, c, "Units in Pack", unitsField);
+            addField(card, c, "Price £", priceField);
+            addField(card, c, "VAT %", vatField);
+            addField(card, c, "Stock Quantity", stockField);
+            addField(card, c, "Minimum Stock", minStockField);
+
+            // Confirm Button (Styled like Add Customer)
+            JPanel buttonWrap = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+            buttonWrap.setOpaque(false);
+
+            JButton confirmButton = new JButton("Confirm");
+            confirmButton.setFont(new Font("SansSerif", Font.BOLD, 18));
+            confirmButton.setForeground(Color.WHITE);
+            confirmButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            confirmButton.setFocusPainted(false);
+            confirmButton.setContentAreaFilled(false);
+            confirmButton.setBorder(BorderFactory.createEmptyBorder(14, 40, 14, 40));
+            confirmButton.setUI(new RoundedDarkButtonUI());
+
+            confirmButton.addActionListener(e -> onConfirm());
+
+            buttonWrap.add(confirmButton);
+
+            c.gridy++;
+            c.insets = new Insets(20, 0, 0, 0);
+            card.add(buttonWrap, c);
+
+            root.add(card);
+            getRootPane().setDefaultButton(confirmButton);
+
+            return root;
+        }
+
+        private void addField(JPanel panel, GridBagConstraints c, String labelText, JTextField field) {
+            JLabel label = new JLabel(labelText);
+            label.setFont(new Font("SansSerif", Font.BOLD, 13));
+            label.setForeground(ThemeManager.textSecondary());
+
+            JPanel block = new JPanel(new BorderLayout(0, 4));
+            block.setOpaque(false);
+            block.add(label, BorderLayout.NORTH);
+            block.add(field, BorderLayout.CENTER);
+
+            c.gridy++;
+            c.insets = new Insets(0, 0, 10, 0);
+            panel.add(block, c);
+        }
+
+        private JTextField createField() {
+            JTextField field = new JTextField();
+            field.setFont(new Font("SansSerif", Font.PLAIN, 15));
+            field.setPreferredSize(new Dimension(0, 40));
+            field.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(ThemeManager.borderColor()),
+                    new EmptyBorder(8, 10, 8, 10)
+            ));
+            return field;
+        }
+
+        private void onConfirm() {
+            if (itemIdField.getText().trim().isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Item ID is required.");
+                return;
+            }
+
+            if (descField.getText().trim().isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Description is required.");
+                return;
+            }
+
+            try {
+                Integer.parseInt(unitsField.getText().trim());
+                Double.parseDouble(priceField.getText().trim());
+                Double.parseDouble(vatField.getText().trim());
+                Integer.parseInt(stockField.getText().trim());
+                Integer.parseInt(minStockField.getText().trim());
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Please check numeric fields.");
+                return;
+            }
+
+            confirmed = true;
+            dispose();
+        }
+
+        public boolean isConfirmed() { return confirmed; }
+        public String getItemId() { return itemIdField.getText().trim(); }
+        public String getDescriptionText() { return descField.getText().trim(); }
+        public String getPackageType() { return pkgField.getText().trim(); }
+        public int getUnitsInPack() { return Integer.parseInt(unitsField.getText().trim()); }
+        public double getPrice() { return Double.parseDouble(priceField.getText().trim()); }
+        public double getVatRate() { return Double.parseDouble(vatField.getText().trim()); }
+        public int getStockQuantity() { return Integer.parseInt(stockField.getText().trim()); }
+        public int getMinimumStock() { return Integer.parseInt(minStockField.getText().trim()); }
     }
 }
