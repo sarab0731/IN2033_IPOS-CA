@@ -1,4 +1,3 @@
-
 package ui;
 
 import database.CustomerDB;
@@ -67,8 +66,9 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
         JPanel leftControls = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
         leftControls.setOpaque(false);
 
-        searchCustomerBtn = new JButton("Search Customer");
-        searchField = new JTextField(18);
+        searchCustomerBtn = createActionButton("Search Customer", true);
+        searchField = new JTextField();
+        searchField.setPreferredSize(new Dimension(280, 42));
 
         leftControls.add(searchCustomerBtn);
         leftControls.add(searchField);
@@ -79,6 +79,9 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
         filterCombo = new JComboBox<>(new String[]{"All Customers", "ACTIVE", "SUSPENDED", "IN_DEFAULT"});
         sortCombo = new JComboBox<>(new String[]{"Sort by: Name", "Sort by: Balance", "Sort by: Credit Limit"});
 
+        filterCombo.setPreferredSize(new Dimension(170, 36));
+        sortCombo.setPreferredSize(new Dimension(190, 36));
+
         rightControls.add(filterCombo);
         rightControls.add(sortCombo);
 
@@ -87,15 +90,18 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
 
         tableCard = AppShell.createCard();
         tableCard.setLayout(new BorderLayout());
+        tableCard.setBorder(new EmptyBorder(18, 18, 18, 18));
 
         tableModel = new DefaultTableModel(
                 new String[]{"Customer ID", "Name", "Discount Plan", "Credit Limit", "Monthly", "Status"}, 0
         ) {
-            @Override public boolean isCellEditable(int row, int col) { return false; }
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
         };
 
         table = new JTable(tableModel);
-
         configureTable(table);
 
         scrollPane = new JScrollPane(table);
@@ -106,10 +112,10 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
         bottomControls = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 0));
         bottomControls.setOpaque(false);
 
-        addCustomerBtn = new JButton("Add Customer");
-        changeStatusBtn = new JButton("Change Status");
-        recordPaymentBtn = new JButton("Record Payment");
-        refreshBtn = new JButton("Refresh");
+        addCustomerBtn = createActionButton("Add Customer", true);
+        changeStatusBtn = createActionButton("Change Status", false);
+        recordPaymentBtn = createActionButton("Record Payment", false);
+        refreshBtn = createActionButton("Refresh", false);
 
         bottomControls.add(addCustomerBtn);
         bottomControls.add(changeStatusBtn);
@@ -169,10 +175,10 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
 
         List<Customer> customers = CustomerDB.getAllActiveCustomers();
         customers.removeIf(c ->
-                (!keyword.isEmpty() &&
-                        !c.getFullName().toLowerCase().contains(keyword) &&
-                        !c.getAccountNumber().toLowerCase().contains(keyword)) ||
-                (!"All Customers".equals(statusFilter) && !c.getAccountStatus().equals(statusFilter))
+                (!keyword.isEmpty()
+                        && !c.getFullName().toLowerCase().contains(keyword)
+                        && !c.getAccountNumber().toLowerCase().contains(keyword))
+                        || (!"All Customers".equals(statusFilter) && !c.getAccountStatus().equals(statusFilter))
         );
 
         if ("Sort by: Balance".equals(sort)) {
@@ -225,7 +231,9 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
             List<DiscountPlan> updated = DiscountPlanDB.getAllPlans();
             planCombo.removeAllItems();
             planCombo.addItem(null);
-            for (DiscountPlan p : updated) planCombo.addItem(p);
+            for (DiscountPlan p : updated) {
+                planCombo.addItem(p);
+            }
         });
 
         Object[] fields = {
@@ -433,38 +441,55 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
         table.setDefaultRenderer(Object.class, renderer);
     }
 
-    private void stylePrimaryButton(JButton button) {
+    private JButton createActionButton(String text, boolean primary) {
+        RoundedActionButton button = new RoundedActionButton(text);
         button.setFocusPainted(false);
-        button.setOpaque(true);
-        button.setBorder(BorderFactory.createEmptyBorder(10, 18, 10, 18));
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         button.setFont(new Font("SansSerif", Font.BOLD, 13));
-        button.setBackground(ThemeManager.buttonDark());
-        button.setForeground(ThemeManager.textLight());
+        button.setHorizontalAlignment(SwingConstants.CENTER);
+        button.setContentAreaFilled(false);
+        button.setOpaque(false);
+        button.setBorder(BorderFactory.createEmptyBorder(12, 20, 12, 20));
+        button.setMargin(new Insets(0, 0, 0, 0));
+        restyleActionButton(button, primary);
+        return button;
     }
 
-    private void styleSecondaryButton(JButton button) {
-        button.setFocusPainted(false);
-        button.setOpaque(true);
-        button.setBorder(BorderFactory.createLineBorder(ThemeManager.borderColor()));
-        button.setFont(new Font("SansSerif", Font.BOLD, 13));
-        button.setBackground(ThemeManager.buttonLight());
-        button.setForeground(ThemeManager.textPrimary());
+    private void restyleActionButton(JButton button, boolean primary) {
+        if (button == null) {
+            return;
+        }
+
+        if (primary) {
+            button.setBackground(ThemeManager.buttonDark());
+            button.setForeground(ThemeManager.textLight());
+            button.putClientProperty("outlineColor", ThemeManager.buttonDark());
+        } else {
+            button.setBackground(ThemeManager.buttonLight());
+            button.setForeground(ThemeManager.textPrimary());
+            button.putClientProperty("outlineColor", ThemeManager.borderColor());
+        }
     }
 
     private void styleCombo(JComboBox<String> comboBox) {
         comboBox.setBackground(ThemeManager.comboBackground());
         comboBox.setForeground(ThemeManager.comboForeground());
-        comboBox.setBorder(BorderFactory.createLineBorder(ThemeManager.borderColor()));
+        comboBox.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(ThemeManager.borderColor()),
+                new EmptyBorder(6, 10, 6, 10)
+        ));
         comboBox.setFocusable(false);
+        comboBox.setFont(new Font("SansSerif", Font.PLAIN, 13));
     }
 
     private void styleField(JTextField field) {
         field.setBackground(ThemeManager.fieldBackground());
         field.setForeground(ThemeManager.fieldForeground());
         field.setCaretColor(ThemeManager.fieldForeground());
+        field.setFont(new Font("SansSerif", Font.PLAIN, 14));
         field.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(ThemeManager.borderColor()),
-                new EmptyBorder(8, 10, 8, 10)
+                new EmptyBorder(10, 12, 10, 12)
         ));
     }
 
@@ -480,11 +505,11 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
         if (table != null) applyTableTheme(table);
         if (scrollPane != null) styleScrollPane(scrollPane);
 
-        if (searchCustomerBtn != null) stylePrimaryButton(searchCustomerBtn);
-        if (addCustomerBtn != null) styleSecondaryButton(addCustomerBtn);
-        if (changeStatusBtn != null) styleSecondaryButton(changeStatusBtn);
-        if (recordPaymentBtn != null) styleSecondaryButton(recordPaymentBtn);
-        if (refreshBtn != null) styleSecondaryButton(refreshBtn);
+        if (searchCustomerBtn != null) restyleActionButton(searchCustomerBtn, true);
+        if (addCustomerBtn != null) restyleActionButton(addCustomerBtn, true);
+        if (changeStatusBtn != null) restyleActionButton(changeStatusBtn, false);
+        if (recordPaymentBtn != null) restyleActionButton(recordPaymentBtn, false);
+        if (refreshBtn != null) restyleActionButton(refreshBtn, false);
 
         if (searchField != null) styleField(searchField);
         if (filterCombo != null) styleCombo(filterCombo);
@@ -492,5 +517,54 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
 
         repaint();
         revalidate();
+    }
+
+    private static class RoundedActionButton extends JButton {
+        public RoundedActionButton(String text) {
+            super(text);
+            setContentAreaFilled(false);
+            setFocusPainted(false);
+            setBorderPainted(false);
+            setOpaque(false);
+            setRolloverEnabled(true);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            Color fill = getBackground();
+            if (getModel().isPressed()) {
+                fill = fill.darker();
+            } else if (getModel().isRollover()) {
+                fill = adjust(fill, 8);
+            }
+
+            g2.setColor(fill);
+            g2.fillRoundRect(0, 0, getWidth(), getHeight(), 26, 26);
+            g2.dispose();
+
+            super.paintComponent(g);
+        }
+
+        @Override
+        protected void paintBorder(Graphics g) {
+            Object value = getClientProperty("outlineColor");
+            Color outline = value instanceof Color ? (Color) value : new Color(210, 210, 210);
+
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(outline);
+            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 26, 26);
+            g2.dispose();
+        }
+
+        private Color adjust(Color c, int amount) {
+            int r = Math.min(255, c.getRed() + amount);
+            int g = Math.min(255, c.getGreen() + amount);
+            int b = Math.min(255, c.getBlue() + amount);
+            return new Color(r, g, b, c.getAlpha());
+        }
     }
 }
