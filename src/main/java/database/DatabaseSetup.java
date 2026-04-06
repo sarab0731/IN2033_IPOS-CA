@@ -44,7 +44,7 @@ public class DatabaseSetup {
             rs.next();
             if (rs.getInt(1) > 0) return;
 
-            String sql = "INSERT INTO users (username, password_hash, full_name, role) VALUES (?, ?, ?, ?)";
+            String sql = "INSERT INTO users (username, password_hash, full_name, user_role) VALUES (?, ?, ?, ?)";
             PreparedStatement stmt = conn.prepareStatement(sql);
 
             String[][] users = {

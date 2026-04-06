@@ -27,7 +27,7 @@ public class UserDB {
                             rs.getInt("user_id"),
                             rs.getString("username"),
                             rs.getString("full_name"),
-                            rs.getString("role")
+                            rs.getString("user_role")
                     );
                 }
             }
@@ -39,9 +39,9 @@ public class UserDB {
         return null;
     }
 
-    public static void insertUser(String username, String plainPassword, String fullName, String role) {
+    public static void insertUser(String username, String plainPassword, String fullName, String user_role) {
         String hash = BCrypt.hashpw(plainPassword, BCrypt.gensalt());
-        String sql = "INSERT INTO users (username, password_hash, full_name, role) VALUES (?, ?, ?, ?)";
+        String sql = "INSERT INTO users (username, password_hash, full_name, user_role) VALUES (?, ?, ?, ?)";
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -49,7 +49,7 @@ public class UserDB {
             stmt.setString(1, username);
             stmt.setString(2, hash);
             stmt.setString(3, fullName);
-            stmt.setString(4, role);
+            stmt.setString(4, user_role);
             stmt.executeUpdate();
 
         } catch (Exception e) {
@@ -70,7 +70,7 @@ public class UserDB {
                         rs.getInt("user_id"),
                         rs.getString("username"),
                         rs.getString("full_name"),
-                        rs.getString("role")
+                        rs.getString("user_role")
                 ));
             }
 
@@ -104,8 +104,8 @@ public class UserDB {
         if (user == null || user.getRole() == null) {
             return false;
         }
-        String role = user.getRole().trim().toLowerCase();
-        return role.equals("admin") || role.equals("administrator");
+        String user_role = user.getRole().trim().toLowerCase();
+        return user_role.equals("admin") || user_role.equals("administrator");
     }
 
     public static boolean authenticateAdmin(String username, String password) {
