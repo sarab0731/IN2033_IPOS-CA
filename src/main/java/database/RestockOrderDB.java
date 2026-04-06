@@ -2,6 +2,7 @@ package database;
 
 import domain.Product;
 import domain.RestockOrder;
+import domain.RestockOrderItem;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -186,6 +187,74 @@ public class RestockOrderDB {
             e.printStackTrace();
         }
         return null;
+    }
+
+    /**
+     * Returns all line items for a given restock order, joined with product details.
+     */
+    public static List<RestockOrderItem> getOrderItems(int restockOrderId) {
+        List<RestockOrderItem> list = new ArrayList<>();
+        String sql = """
+            SELECT roi.restock_order_item_id, roi.restock_order_id,
+                   p.item_id, p.description,
+                   roi.quantity, roi.unit_cost, roi.line_total
+            FROM restock_order_items roi
+            JOIN products p ON roi.product_id = p.product_id
+            WHERE roi.restock_order_id = ?
+            ORDER BY roi.restock_order_item_id
+            """;
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, restockOrderId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                list.add(new RestockOrderItem(
+                        rs.getInt("restock_order_item_id"),
+                        rs.getInt("restock_order_id"),
+                        rs.getString("item_id"),
+                        rs.getString("description"),
+                        rs.getInt("quantity"),
+                        rs.getDouble("unit_cost"),
+                        rs.getDouble("line_total")
+                ));
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    /**
+     * Returns the total outstanding value of all non-DELIVERED orders.
+     */
+    public static double getOutstandingValue() {
+        String sql = "SELECT COALESCE(SUM(total_value), 0) FROM restock_orders WHERE status <> 'DELIVERED'";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            if (rs.next()) return rs.getDouble(1);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    /**
+     * Returns the count of non-DELIVERED orders.
+     */
+    public static int getActiveOrderCount() {
+        String sql = "SELECT COUNT(*) FROM restock_orders WHERE status <> 'DELIVERED'";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            if (rs.next()) return rs.getInt(1);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
     }
 
     /**

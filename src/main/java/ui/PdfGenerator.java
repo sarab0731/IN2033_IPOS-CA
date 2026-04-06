@@ -125,9 +125,8 @@ public class PdfGenerator {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Appendix 7 — Retail Invoice
-    // -------------------------------------------------------------------------
+
+    // Retail Invoice
 
     public static class InvoiceItem {
         public final String description;

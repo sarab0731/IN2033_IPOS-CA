@@ -4,6 +4,7 @@ import database.ProductDB;
 import database.RestockOrderDB;
 import domain.Product;
 import domain.RestockOrder;
+import domain.RestockOrderItem;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -44,6 +45,10 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
     private JLabel merchantIdLabel;
     private JLabel merchantIdValue;
     private JLabel totalLabel;
+
+    private JLabel merchantStatusLabel;
+    private JLabel activeOrdersValue;
+    private JLabel outstandingValue;
 
     private DefaultTableModel productsModel;
     private DefaultTableModel summaryModel;
@@ -189,7 +194,16 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         wrapper.add(centerSection, BorderLayout.CENTER);
         wrapper.add(bottomBar, BorderLayout.SOUTH);
 
-        contentPanel.add(topTabBar, BorderLayout.NORTH);
+        JPanel merchantCard = buildMerchantStatusCard();
+
+        JPanel northStack = new JPanel();
+        northStack.setLayout(new BoxLayout(northStack, BoxLayout.Y_AXIS));
+        northStack.setOpaque(false);
+        northStack.add(topTabBar);
+        northStack.add(Box.createVerticalStrut(8));
+        northStack.add(merchantCard);
+
+        contentPanel.add(northStack, BorderLayout.NORTH);
         contentPanel.add(wrapper, BorderLayout.CENTER);
 
         return contentPanel;
@@ -211,6 +225,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
             @Override
             public void componentShown(java.awt.event.ComponentEvent e) {
                 loadCatalogue();
+                refreshMerchantStatus();
             }
         });
     }
@@ -320,9 +335,23 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         String orderNumber = RestockOrderDB.placeOrder(merchantId, cart);
 
         if (orderNumber != null) {
-            JOptionPane.showMessageDialog(this, "Order placed successfully.\nOrder number: " + orderNumber);
+            refreshMerchantStatus();
             clearOrder();
             loadCatalogue();
+
+            int print = JOptionPane.showConfirmDialog(this,
+                    "Order placed successfully.\nOrder number: " + orderNumber
+                    + "\n\nWould you like to print the order form?",
+                    "Order Placed", JOptionPane.YES_NO_OPTION);
+
+            if (print == JOptionPane.YES_OPTION) {
+                RestockOrder placed = RestockOrderDB.getByOrderNumber(orderNumber);
+                if (placed != null) {
+                    java.util.List<RestockOrderItem> items =
+                            RestockOrderDB.getOrderItems(placed.getRestockOrderId());
+                    PdfGenerator.generateOrderForm(this, placed, items);
+                }
+            }
         } else {
             JOptionPane.showMessageDialog(this, "Failed to place order.");
         }
@@ -347,8 +376,10 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
 
         loadOrderHistory(historyModel);
 
-        JButton refreshHistoryBtn = createRestockStyleButton("Refresh", false);
-        JButton updateStatusBtn = createRestockStyleButton("Update Status", true);
+        JButton refreshHistoryBtn  = createRestockStyleButton("Refresh", false);
+        JButton viewItemsBtn       = createRestockStyleButton("View Items", false);
+        JButton printOrderFormBtn  = createRestockStyleButton("Print Order Form", false);
+        JButton updateStatusBtn    = createRestockStyleButton("Update Status", true);
 
         JPanel panel = new JPanel(new BorderLayout(12, 12));
         panel.setBorder(new EmptyBorder(12, 12, 12, 12));
@@ -358,6 +389,8 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
         buttons.setOpaque(false);
         buttons.add(refreshHistoryBtn);
+        buttons.add(viewItemsBtn);
+        buttons.add(printOrderFormBtn);
         buttons.add(updateStatusBtn);
         panel.add(buttons, BorderLayout.SOUTH);
 
@@ -371,6 +404,25 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         dialog.setLocationRelativeTo(this);
 
         refreshHistoryBtn.addActionListener(e -> loadOrderHistory(historyModel));
+
+        viewItemsBtn.addActionListener(e -> {
+            int row = historyTable.getSelectedRow();
+            if (row == -1) { JOptionPane.showMessageDialog(dialog, "Please select an order."); return; }
+            int orderId = (int) historyModel.getValueAt(historyTable.convertRowIndexToModel(row), 0);
+            showOrderItemsDialog(dialog, orderId);
+        });
+
+        printOrderFormBtn.addActionListener(e -> {
+            int row = historyTable.getSelectedRow();
+            if (row == -1) { JOptionPane.showMessageDialog(dialog, "Please select an order."); return; }
+            int modelRow = historyTable.convertRowIndexToModel(row);
+            int orderId  = (int) historyModel.getValueAt(modelRow, 0);
+            String orderNum = String.valueOf(historyModel.getValueAt(modelRow, 1));
+            RestockOrder order = RestockOrderDB.getByOrderNumber(orderNum);
+            if (order == null) return;
+            java.util.List<RestockOrderItem> items = RestockOrderDB.getOrderItems(orderId);
+            PdfGenerator.generateOrderForm(dialog, order, items);
+        });
 
         updateStatusBtn.addActionListener(e -> {
             int row = historyTable.getSelectedRow();
@@ -419,6 +471,86 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
                     order.getCreatedAt()
             });
         }
+    }
+
+    private void showOrderItemsDialog(java.awt.Window parent, int restockOrderId) {
+        java.util.List<RestockOrderItem> items = RestockOrderDB.getOrderItems(restockOrderId);
+
+        DefaultTableModel itemModel = new DefaultTableModel(
+                new String[]{"Item ID", "Description", "Qty", "Unit Cost £", "Line Total £"}, 0
+        ) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+
+        double grandTotal = 0;
+        for (RestockOrderItem item : items) {
+            itemModel.addRow(new Object[]{
+                    item.getItemId(),
+                    item.getDescription(),
+                    item.getQuantity(),
+                    String.format("%.2f", item.getUnitCost()),
+                    String.format("%.2f", item.getLineTotal())
+            });
+            grandTotal += item.getLineTotal();
+        }
+
+        JTable itemTable = new JTable(itemModel);
+        configureTable(itemTable);
+        applyTableTheme(itemTable);
+
+        JScrollPane scroll = new JScrollPane(itemTable);
+        styleScrollPane(scroll);
+        scroll.setPreferredSize(new Dimension(600, 250));
+
+        JLabel totalLbl = new JLabel("Grand Total: £" + String.format("%.2f", grandTotal));
+        totalLbl.setFont(new Font("SansSerif", Font.BOLD, 13));
+        totalLbl.setBorder(new EmptyBorder(8, 0, 0, 0));
+
+        JPanel content = new JPanel(new BorderLayout(8, 8));
+        content.setBorder(new EmptyBorder(12, 12, 12, 12));
+        content.setBackground(ThemeManager.panelBackground());
+        content.add(scroll, BorderLayout.CENTER);
+        content.add(totalLbl, BorderLayout.SOUTH);
+
+        JDialog d = new JDialog(parent, "Order Items", Dialog.ModalityType.APPLICATION_MODAL);
+        d.setContentPane(content);
+        d.pack();
+        d.setLocationRelativeTo(parent);
+        d.setVisible(true);
+    }
+
+    private JPanel buildMerchantStatusCard() {
+        JPanel card = AppShell.createCard();
+        card.setLayout(new FlowLayout(FlowLayout.LEFT, 18, 6));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 52));
+
+        merchantStatusLabel = new JLabel("Merchant Account:");
+        merchantStatusLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
+
+        JLabel activeLabel = new JLabel("Active Orders:");
+        activeOrdersValue  = new JLabel("—");
+
+        JLabel outLabel  = new JLabel("Outstanding Value:");
+        outstandingValue = new JLabel("—");
+
+        card.add(merchantStatusLabel);
+        card.add(Box.createHorizontalStrut(12));
+        card.add(activeLabel);
+        card.add(activeOrdersValue);
+        card.add(Box.createHorizontalStrut(18));
+        card.add(outLabel);
+        card.add(outstandingValue);
+
+        refreshMerchantStatus();
+        return card;
+    }
+
+    private void refreshMerchantStatus() {
+        if (activeOrdersValue == null) return;
+        int count        = RestockOrderDB.getActiveOrderCount();
+        double outstanding = RestockOrderDB.getOutstandingValue();
+        activeOrdersValue.setText(String.valueOf(count));
+        outstandingValue.setText(String.format("£%.2f", outstanding));
     }
 
     private String getNextStatus(String current) {
