@@ -34,6 +34,10 @@ public class Session {
         return currentUser != null && currentUser.isPharmacist();
     }
 
+    public static boolean isManagerOrAdmin() {
+        return isManager() || isAdmin();
+    }
+
     public static boolean hasRole(String role) {
         return currentUser != null && currentUser.getRole().equals(role);
     }

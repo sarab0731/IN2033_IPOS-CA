@@ -128,8 +128,8 @@ public class SaleDB {
     public static String generateInvoice(int saleId, int customerId, double amountDue) {
         String num = "INV-" + System.currentTimeMillis();
         String sql = """
-            INSERT INTO invoices (invoice_number, customer_id, sale_id, amount_due, status)
-            VALUES (?, ?, ?, ?, 'UNPAID')
+            INSERT INTO invoices (invoice_number, customer_id, sale_id, amount_due, due_date, status)
+            VALUES (?, ?, ?, ?, DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'UNPAID')
             """;
 
         try (Connection conn = DatabaseManager.getConnection();

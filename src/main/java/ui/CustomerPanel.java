@@ -1,5 +1,6 @@
 package ui;
 
+import app.Session;
 import database.CustomerDB;
 import database.DiscountPlanDB;
 import domain.Customer;
@@ -138,9 +139,19 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
         filterCombo.addActionListener(e -> refreshAction.run());
         sortCombo.addActionListener(e -> refreshAction.run());
 
-        addCustomerBtn.addActionListener(e -> showAddDialog());
+        addCustomerBtn.addActionListener(e -> {
+            if (!Session.isManagerOrAdmin()) {
+                JOptionPane.showMessageDialog(this, "Only Managers and Admins can add customers.");
+                return;
+            }
+            showAddDialog();
+        });
 
         changeStatusBtn.addActionListener(e -> {
+            if (!Session.isManagerOrAdmin()) {
+                JOptionPane.showMessageDialog(this, "Only Managers and Admins can change customer status.");
+                return;
+            }
             int row = table.getSelectedRow();
             if (row == -1) {
                 JOptionPane.showMessageDialog(this, "Please select a customer.");
@@ -359,7 +370,7 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
 
     private void showAddDiscountPlanDialog() {
         JTextField nameField = new JTextField();
-        JComboBox<String> typeCombo = new JComboBox<>(new String[]{"PERCENTAGE", "ACCOUNT"});
+        JComboBox<String> typeCombo = new JComboBox<>(new String[]{"FIXED", "FLEXIBLE"});
         JTextField discountField = new JTextField("0.00");
         JTextField notesField = new JTextField();
 
