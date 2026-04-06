@@ -20,7 +20,8 @@ public class MainFrame extends JFrame {
     public MainFrame() {
         super("IPOS-CA");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setExtendedState(JFrame.MAXIMIZED_BOTH);
+        //setExtendedState(JFrame.MAXIMIZED_BOTH);
+        setSize(1280, 720);
         setLocationRelativeTo(null);
 
         ScreenRouter router = new ScreenRouter(cards, root);

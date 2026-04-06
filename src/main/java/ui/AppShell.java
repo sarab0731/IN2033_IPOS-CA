@@ -81,7 +81,7 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         top.add(logoLabel);
         top.add(Box.createVerticalStrut(28));
 
-        addNavButton(top, "Overview", MainFrame.SCREEN_DASHBOARD);
+        addNavButton(top, "Dashboard", MainFrame.SCREEN_DASHBOARD);
         addNavButton(top, "Stock", MainFrame.SCREEN_STOCK);
         addNavButton(top, "Sales", MainFrame.SCREEN_SALES);
         addNavButton(top, "Customers", MainFrame.SCREEN_CUSTOMERS);
