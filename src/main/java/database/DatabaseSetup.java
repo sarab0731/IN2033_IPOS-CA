@@ -17,7 +17,6 @@ public class DatabaseSetup {
             conn.setAutoCommit(false);
 
             Statement stmt = conn.createStatement();
-            stmt.execute("PRAGMA foreign_keys = ON;");
 
             String sql = Files.readString(Paths.get("sql/schema.sql"));
             String[] statements = sql.split(";");

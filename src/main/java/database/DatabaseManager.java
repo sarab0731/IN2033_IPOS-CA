@@ -5,10 +5,12 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class DatabaseManager {
-    //No need to touch this file
-    private static final String DB_URL = "jdbc:sqlite:database/ipos.db";
+
+    private static final String URL      = "jdbc:mysql://localhost:3306/IPOS-CA";
+    private static final String USER     = "root";
+    private static final String PASSWORD = "Password123";
 
     public static Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(DB_URL);
+        return DriverManager.getConnection(URL, USER, PASSWORD);
     }
 }
