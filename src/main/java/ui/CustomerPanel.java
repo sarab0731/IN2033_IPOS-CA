@@ -9,37 +9,154 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
-public class CustomerPanel extends JPanel {
+public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener {
 
-    private DefaultTableModel tableModel;
+    private final ScreenRouter router;
+
+    private JPanel contentPanel;
+    private JPanel topControls;
+    private JPanel bottomControls;
+    private JPanel tableCard;
+
     private JTable table;
+    private JScrollPane scrollPane;
+    private DefaultTableModel tableModel;
+
+    private JButton searchCustomerBtn;
+    private JButton addCustomerBtn;
+    private JButton changeStatusBtn;
+    private JButton recordPaymentBtn;
+    private JButton refreshBtn;
 
     private JTextField searchField;
     private JComboBox<String> filterCombo;
     private JComboBox<String> sortCombo;
 
-    private List<Customer> currentCustomers = new ArrayList<>();
-
     public CustomerPanel(ScreenRouter router) {
-        setLayout(new BorderLayout());
-        setBackground(new Color(242, 242, 242));
+        this.router = router;
 
-        JPanel customerContent = buildCustomerContent(router);
+        setLayout(new BorderLayout());
+        ThemeManager.register(this);
 
         AppShell shell = new AppShell(
                 router,
                 MainFrame.SCREEN_CUSTOMERS,
                 "Customer Information",
                 "Manage customer accounts",
-                customerContent
+                buildContent()
         );
 
         add(shell, BorderLayout.CENTER);
+        wireActions();
+        loadTable();
+        applyTheme();
+    }
+
+    private JPanel buildContent() {
+        contentPanel = new JPanel(new BorderLayout(20, 20));
+        contentPanel.setBorder(new EmptyBorder(8, 8, 8, 8));
+
+        topControls = new JPanel(new BorderLayout(20, 0));
+        topControls.setOpaque(false);
+
+        JPanel leftControls = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        leftControls.setOpaque(false);
+
+        searchCustomerBtn = createActionButton("Search Customer", true);
+        searchField = new JTextField();
+        searchField.setPreferredSize(new Dimension(280, 42));
+
+        leftControls.add(searchCustomerBtn);
+        leftControls.add(searchField);
+
+        JPanel rightControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        rightControls.setOpaque(false);
+
+        filterCombo = new JComboBox<>(new String[]{"All Customers", "ACTIVE", "SUSPENDED", "IN_DEFAULT"});
+        sortCombo = new JComboBox<>(new String[]{"Sort by: Name", "Sort by: Balance", "Sort by: Credit Limit"});
+
+        filterCombo.setPreferredSize(new Dimension(170, 36));
+        sortCombo.setPreferredSize(new Dimension(190, 36));
+
+        rightControls.add(filterCombo);
+        rightControls.add(sortCombo);
+
+        topControls.add(leftControls, BorderLayout.WEST);
+        topControls.add(rightControls, BorderLayout.EAST);
+
+        tableCard = AppShell.createCard();
+        tableCard.setLayout(new BorderLayout());
+        tableCard.setBorder(new EmptyBorder(18, 18, 18, 18));
+
+        tableModel = new DefaultTableModel(
+                new String[]{"Customer ID", "Name", "Discount Plan", "Credit Limit", "Monthly", "Status"}, 0
+        ) {
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
+        };
+
+        table = new JTable(tableModel);
+        configureTable(table);
+
+        scrollPane = new JScrollPane(table);
+        styleScrollPane(scrollPane);
+
+        tableCard.add(scrollPane, BorderLayout.CENTER);
+
+        bottomControls = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 0));
+        bottomControls.setOpaque(false);
+
+        addCustomerBtn = createActionButton("Add Customer", true);
+        changeStatusBtn = createActionButton("Change Status", false);
+        recordPaymentBtn = createActionButton("Record Payment", false);
+        refreshBtn = createActionButton("Refresh", false);
+
+        bottomControls.add(addCustomerBtn);
+        bottomControls.add(changeStatusBtn);
+        bottomControls.add(recordPaymentBtn);
+        bottomControls.add(refreshBtn);
+
+        contentPanel.add(topControls, BorderLayout.NORTH);
+        contentPanel.add(tableCard, BorderLayout.CENTER);
+        contentPanel.add(bottomControls, BorderLayout.SOUTH);
+
+        return contentPanel;
+    }
+
+    private void wireActions() {
+        Runnable refreshAction = this::loadTable;
+
+        refreshBtn.addActionListener(e -> refreshAction.run());
+        searchCustomerBtn.addActionListener(e -> refreshAction.run());
+        searchField.addActionListener(e -> refreshAction.run());
+        filterCombo.addActionListener(e -> refreshAction.run());
+        sortCombo.addActionListener(e -> refreshAction.run());
+
+        addCustomerBtn.addActionListener(e -> showAddDialog());
+
+        changeStatusBtn.addActionListener(e -> {
+            int row = table.getSelectedRow();
+            if (row == -1) {
+                JOptionPane.showMessageDialog(this, "Please select a customer.");
+                return;
+            }
+            showChangeStatusDialog(row);
+        });
+
+        recordPaymentBtn.addActionListener(e -> {
+            int row = table.getSelectedRow();
+            if (row == -1) {
+                JOptionPane.showMessageDialog(this, "Please select a customer.");
+                return;
+            }
+            showRecordPaymentDialog(row);
+        });
 
         addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
@@ -49,285 +166,45 @@ public class CustomerPanel extends JPanel {
         });
     }
 
-    private JPanel buildCustomerContent(ScreenRouter router) {
-        JPanel outer = new JPanel(new BorderLayout());
-        outer.setOpaque(false);
-
-        JPanel card = AppShell.createCard();
-        card.setLayout(new BorderLayout(0, 18));
-        card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(232, 232, 232)),
-                new EmptyBorder(20, 20, 20, 20)
-        ));
-
-        card.add(buildTopBar(), BorderLayout.NORTH);
-        card.add(buildTableSection(), BorderLayout.CENTER);
-        card.add(buildFooterSection(), BorderLayout.SOUTH);
-
-        outer.add(card, BorderLayout.CENTER);
-        return outer;
-    }
-
-    private JPanel buildTopBar() {
-        JPanel top = new JPanel(new BorderLayout());
-        top.setOpaque(false);
-
-        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        left.setOpaque(false);
-
-        JButton searchBtn = buildDarkButton("Search Customer");
-        searchBtn.addActionListener(e -> applyFiltersAndSorting());
-
-        searchField = new JTextField(16);
-        searchField.setPreferredSize(new Dimension(170, 32));
-        searchField.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(220, 220, 220)),
-                new EmptyBorder(6, 10, 6, 10)
-        ));
-        searchField.setFont(new Font("SansSerif", Font.PLAIN, 12));
-
-        left.add(searchBtn);
-        left.add(searchField);
-
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        right.setOpaque(false);
-
-        filterCombo = new JComboBox<>(new String[]{
-                "All Customers", "Active", "Suspended", "In Default"
-        });
-
-        sortCombo = new JComboBox<>(new String[]{
-                "Sort by: Name", "Sort by: Account Number", "Sort by: Credit Limit", "Sort by: Monthly"
-        });
-
-        styleCombo(filterCombo);
-        styleCombo(sortCombo);
-
-        filterCombo.addActionListener(e -> applyFiltersAndSorting());
-        sortCombo.addActionListener(e -> applyFiltersAndSorting());
-
-        right.add(filterCombo);
-        right.add(sortCombo);
-
-        top.add(left, BorderLayout.WEST);
-        top.add(right, BorderLayout.EAST);
-
-        return top;
-    }
-
-    private JPanel buildTableSection() {
-        JPanel center = new JPanel(new BorderLayout());
-        center.setOpaque(false);
-
-        String[] columns = {
-                "Customer ID", "Name", "Discount Plan", "Credit Limit", "Monthly", "Status"
-        };
-
-        tableModel = new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int r, int c) {
-                return false;
-            }
-        };
-
-        table = new JTable(tableModel);
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        table.setRowHeight(42);
-        table.setShowGrid(false);
-        table.setIntercellSpacing(new Dimension(0, 0));
-        table.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        table.setForeground(new Color(35, 35, 35));
-        table.setSelectionBackground(new Color(235, 235, 235));
-        table.setSelectionForeground(new Color(35, 35, 35));
-
-        styleTableHeader(table);
-
-        table.getColumnModel().getColumn(5).setCellRenderer(new StatusCellRenderer());
-
-        JScrollPane scrollPane = new JScrollPane(table);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-        scrollPane.getViewport().setBackground(Color.WHITE);
-
-        center.add(scrollPane, BorderLayout.CENTER);
-
-        return center;
-    }
-
-    private JPanel buildFooterSection() {
-        JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
-        footer.setOpaque(false);
-
-        JButton addBtn = buildLightButton("Add Customer");
-        JButton statusBtn = buildLightButton("Change Status");
-        JButton paymentBtn = buildLightButton("Record Payment");
-        JButton refreshBtn = buildLightButton("Refresh");
-
-        addBtn.addActionListener(e -> showAddDialog());
-
-        statusBtn.addActionListener(e -> {
-            int row = table.getSelectedRow();
-            if (row == -1) {
-                JOptionPane.showMessageDialog(this, "Please select a customer.");
-                return;
-            }
-            showChangeStatusDialog(row);
-        });
-
-        paymentBtn.addActionListener(e -> {
-            int row = table.getSelectedRow();
-            if (row == -1) {
-                JOptionPane.showMessageDialog(this, "Please select a customer.");
-                return;
-            }
-            showRecordPaymentDialog(row);
-        });
-
-        refreshBtn.addActionListener(e -> loadTable());
-
-        footer.add(addBtn);
-        footer.add(statusBtn);
-        footer.add(paymentBtn);
-        footer.add(refreshBtn);
-
-        return footer;
-    }
-
-    private JButton buildDarkButton(String text) {
-        JButton btn = new JButton(text);
-        btn.setFocusPainted(false);
-        btn.setBorderPainted(false);
-        btn.setContentAreaFilled(true);
-        btn.setOpaque(true);
-        btn.setBackground(new Color(30, 32, 38));
-        btn.setForeground(Color.WHITE);
-        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setBorder(new EmptyBorder(9, 16, 9, 16));
-        return btn;
-    }
-
-    private JButton buildLightButton(String text) {
-        JButton btn = new JButton(text);
-        btn.setFocusPainted(false);
-        btn.setContentAreaFilled(true);
-        btn.setOpaque(true);
-        btn.setBackground(Color.WHITE);
-        btn.setForeground(new Color(45, 45, 45));
-        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(220, 220, 220)),
-                new EmptyBorder(9, 16, 9, 16)
-        ));
-        return btn;
-    }
-
-    private void styleCombo(JComboBox<String> combo) {
-        combo.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        combo.setBackground(Color.WHITE);
-        combo.setForeground(new Color(80, 80, 80));
-        combo.setFocusable(false);
-        combo.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(220, 220, 220)),
-                new EmptyBorder(4, 8, 4, 8)
-        ));
-    }
-
-    private void styleTableHeader(JTable table) {
-        table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
-        table.getTableHeader().setBackground(Color.WHITE);
-        table.getTableHeader().setForeground(new Color(25, 25, 25));
-        table.getTableHeader().setBorder(BorderFactory.createEmptyBorder());
-        table.getTableHeader().setReorderingAllowed(false);
-    }
-
     private void loadTable() {
-        currentCustomers = CustomerDB.getAllActiveCustomers();
-        applyFiltersAndSorting();
-    }
-
-    private void applyFiltersAndSorting() {
-        if (tableModel == null) {
-            return;
-        }
-
         tableModel.setRowCount(0);
 
-        List<Customer> displayList = new ArrayList<>(currentCustomers);
+        String keyword = searchField.getText() == null ? "" : searchField.getText().trim().toLowerCase();
+        String statusFilter = (String) filterCombo.getSelectedItem();
+        String sort = (String) sortCombo.getSelectedItem();
 
-        String keyword = searchField != null ? searchField.getText().trim().toLowerCase() : "";
-        String filter = filterCombo != null ? (String) filterCombo.getSelectedItem() : "All Customers";
-        String sort = sortCombo != null ? (String) sortCombo.getSelectedItem() : "Sort by: Name";
+        List<Customer> customers = CustomerDB.getAllActiveCustomers();
+        customers.removeIf(c ->
+                (!keyword.isEmpty()
+                        && !c.getFullName().toLowerCase().contains(keyword)
+                        && !c.getAccountNumber().toLowerCase().contains(keyword))
+                        || (!"All Customers".equals(statusFilter) && !c.getAccountStatus().equals(statusFilter))
+        );
 
-        if (!keyword.isEmpty()) {
-            displayList.removeIf(c ->
-                    !(safe(c.getAccountNumber()).toLowerCase().contains(keyword)
-                            || safe(c.getFullName()).toLowerCase().contains(keyword)
-                            || safe(c.getEmail()).toLowerCase().contains(keyword)
-                            || safe(c.getPhone()).toLowerCase().contains(keyword))
-            );
-        }
-
-        if ("Active".equals(filter)) {
-            displayList.removeIf(c -> !"ACTIVE".equalsIgnoreCase(c.getAccountStatus()));
-        } else if ("Suspended".equals(filter)) {
-            displayList.removeIf(c -> !"SUSPENDED".equalsIgnoreCase(c.getAccountStatus()));
-        } else if ("In Default".equals(filter)) {
-            displayList.removeIf(c -> !"IN_DEFAULT".equalsIgnoreCase(c.getAccountStatus()));
-        }
-
-        if ("Sort by: Name".equals(sort)) {
-            displayList.sort(Comparator.comparing(Customer::getFullName, String.CASE_INSENSITIVE_ORDER));
-        } else if ("Sort by: Account Number".equals(sort)) {
-            displayList.sort(Comparator.comparing(Customer::getAccountNumber, String.CASE_INSENSITIVE_ORDER));
+        if ("Sort by: Balance".equals(sort)) {
+            customers.sort((a, b) -> Double.compare(b.getCurrentBalance(), a.getCurrentBalance()));
         } else if ("Sort by: Credit Limit".equals(sort)) {
-            displayList.sort(Comparator.comparingDouble(Customer::getCreditLimit).reversed());
-        } else if ("Sort by: Monthly".equals(sort)) {
-            displayList.sort(Comparator.comparingDouble(Customer::getCurrentBalance).reversed());
+            customers.sort((a, b) -> Double.compare(b.getCreditLimit(), a.getCreditLimit()));
+        } else {
+            customers.sort((a, b) -> a.getFullName().compareToIgnoreCase(b.getFullName()));
         }
 
-        for (Customer c : displayList) {
+        for (Customer c : customers) {
+            String discountText = "None";
+            if (c.getDiscountPlanId() > 0) {
+                DiscountPlan plan = DiscountPlanDB.getById(c.getDiscountPlanId());
+                discountText = plan != null ? plan.getPlanName() : ("Plan #" + c.getDiscountPlanId());
+            }
+
             tableModel.addRow(new Object[]{
-                    c.getAccountNumber(),
-                    c.getFullName(),
-                    getDiscountPlanName(c.getDiscountPlanId()),
+                    c.getCustomerId(),
+                    c.getFullName() + " (" + c.getAccountNumber() + ")",
+                    discountText,
                     String.format("£%.2f", c.getCreditLimit()),
                     String.format("£%.2f", c.getCurrentBalance()),
-                    formatStatus(c.getAccountStatus())
+                    c.getAccountStatus()
             });
         }
-    }
-
-    private String safe(String value) {
-        return value == null ? "" : value;
-    }
-
-    private String getDiscountPlanName(int planId) {
-        if (planId <= 0) {
-            return "None";
-        }
-        DiscountPlan plan = DiscountPlanDB.getById(planId);
-        return plan != null ? plan.getPlanName() : "Plan " + planId;
-    }
-
-    private String formatStatus(String status) {
-        if (status == null) {
-            return "";
-        }
-        return switch (status) {
-            case "ACTIVE" -> "Active";
-            case "SUSPENDED" -> "Suspended";
-            case "IN_DEFAULT" -> "In Default";
-            default -> status;
-        };
-    }
-
-    private Customer getSelectedCustomerFromTableRow(int row) {
-        String accountNumber = tableModel.getValueAt(row, 0).toString();
-        return currentCustomers.stream()
-                .filter(c -> accountNumber.equals(c.getAccountNumber()))
-                .findFirst()
-                .orElse(null);
     }
 
     private void showAddDialog() {
@@ -344,7 +221,7 @@ public class CustomerPanel extends JPanel {
         planCombo.insertItemAt(null, 0);
         planCombo.setSelectedIndex(0);
 
-        JButton newPlanBtn = buildLightButton("+ New Plan");
+        JButton newPlanBtn = new JButton("+ New Plan");
         JPanel planPanel = new JPanel(new BorderLayout(4, 0));
         planPanel.add(planCombo, BorderLayout.CENTER);
         planPanel.add(newPlanBtn, BorderLayout.EAST);
@@ -370,9 +247,7 @@ public class CustomerPanel extends JPanel {
         };
 
         int result = JOptionPane.showConfirmDialog(this, fields, "Add Customer", JOptionPane.OK_CANCEL_OPTION);
-        if (result != JOptionPane.OK_OPTION) {
-            return;
-        }
+        if (result != JOptionPane.OK_OPTION) return;
 
         if (accNumField.getText().trim().isEmpty() || nameField.getText().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this, "Account number and name are required.");
@@ -383,7 +258,7 @@ public class CustomerPanel extends JPanel {
             DiscountPlan selectedPlan = (DiscountPlan) planCombo.getSelectedItem();
             int planId = selectedPlan != null ? selectedPlan.getDiscountPlanId() : 0;
 
-            Customer c = new Customer(
+            Customer customer = new Customer(
                     0,
                     accNumField.getText().trim(),
                     nameField.getText().trim(),
@@ -396,171 +271,300 @@ public class CustomerPanel extends JPanel {
                     planId
             );
 
-            if (CustomerDB.addCustomer(c)) {
+            if (CustomerDB.addCustomer(customer)) {
                 loadTable();
             } else {
                 JOptionPane.showMessageDialog(this, "Failed to add customer. Account number may already exist.");
             }
-
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(this, "Please enter a valid credit limit.");
         }
     }
 
     private void showChangeStatusDialog(int row) {
-        Customer customer = getSelectedCustomerFromTableRow(row);
+        int customerId = (int) tableModel.getValueAt(row, 0);
+        Customer customer = CustomerDB.getById(customerId);
         if (customer == null) {
-            JOptionPane.showMessageDialog(this, "Could not load selected customer.");
+            JOptionPane.showMessageDialog(this, "Could not load the selected customer.");
             return;
         }
 
-        int customerId = customer.getCustomerId();
-        String current = customer.getAccountStatus();
-        String name = customer.getFullName();
-
-        String[] options;
-        if ("IN_DEFAULT".equals(current)) {
-            options = new String[]{"ACTIVE", "SUSPENDED"};
-        } else {
-            options = new String[]{"ACTIVE", "SUSPENDED", "IN_DEFAULT"};
-        }
-
+        String[] options = {"ACTIVE", "SUSPENDED", "IN_DEFAULT"};
         String chosen = (String) JOptionPane.showInputDialog(
                 this,
-                "Change status for: " + name + "\nCurrent: " + current,
+                "Change status for " + customer.getFullName(),
                 "Change Status",
                 JOptionPane.PLAIN_MESSAGE,
                 null,
                 options,
-                current
+                customer.getAccountStatus()
         );
 
-        if (chosen != null && !chosen.equals(current)) {
+        if (chosen != null && !chosen.equals(customer.getAccountStatus())) {
             CustomerDB.updateStatus(customerId, chosen);
             loadTable();
         }
     }
 
     private void showRecordPaymentDialog(int row) {
-        Customer customer = getSelectedCustomerFromTableRow(row);
+        int customerId = (int) tableModel.getValueAt(row, 0);
+        Customer customer = CustomerDB.getById(customerId);
         if (customer == null) {
-            JOptionPane.showMessageDialog(this, "Could not load selected customer.");
+            JOptionPane.showMessageDialog(this, "Could not load the selected customer.");
             return;
         }
-
-        int customerId = customer.getCustomerId();
-        String name = customer.getFullName();
-        double balance = customer.getCurrentBalance();
 
         JTextField amountField = new JTextField();
         JComboBox<String> methodCombo = new JComboBox<>(new String[]{"CARD", "BANK_TRANSFER", "CASH"});
 
         Object[] fields = {
-                "Customer: " + name,
-                "Current Balance: £" + String.format("%.2f", balance),
+                "Customer: " + customer.getFullName(),
+                "Current Balance: £" + String.format("%.2f", customer.getCurrentBalance()),
                 "Payment Amount £:", amountField,
                 "Payment Method:", methodCombo
         };
 
         int result = JOptionPane.showConfirmDialog(this, fields, "Record Payment", JOptionPane.OK_CANCEL_OPTION);
-        if (result != JOptionPane.OK_OPTION) {
-            return;
-        }
+        if (result != JOptionPane.OK_OPTION) return;
 
         try {
             double amount = Double.parseDouble(amountField.getText().trim());
-            if (amount <= 0) {
-                throw new NumberFormatException();
-            }
+            if (amount <= 0) throw new NumberFormatException();
 
-            double newBalance = Math.max(0, balance - amount);
+            double newBalance = Math.max(0, customer.getCurrentBalance() - amount);
             CustomerDB.updateBalance(customerId, newBalance);
 
             if ("SUSPENDED".equals(customer.getAccountStatus()) && newBalance == 0) {
                 CustomerDB.updateStatus(customerId, "ACTIVE");
             }
 
+            CustomerDB.recordAccountPayment(
+                    customerId,
+                    0,
+                    app.Session.getUserId(),
+                    (String) methodCombo.getSelectedItem(),
+                    amount,
+                    "Recorded from customer panel"
+            );
+
             loadTable();
             JOptionPane.showMessageDialog(
                     this,
-                    "Payment of £" + String.format("%.2f", amount)
-                            + " recorded.\nNew balance: £"
-                            + String.format("%.2f", newBalance)
+                    "Payment recorded.\nNew balance: £" + String.format("%.2f", newBalance)
             );
-
         } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Please enter a valid amount.");
+            JOptionPane.showMessageDialog(this, "Please enter a valid payment amount.");
         }
     }
 
     private void showAddDiscountPlanDialog() {
         JTextField nameField = new JTextField();
-        JComboBox<String> typeCombo = new JComboBox<>(new String[]{"FIXED", "FLEXIBLE"});
-        JTextField percentField = new JTextField();
+        JComboBox<String> typeCombo = new JComboBox<>(new String[]{"PERCENTAGE", "ACCOUNT"});
+        JTextField discountField = new JTextField("0.00");
         JTextField notesField = new JTextField();
 
         Object[] fields = {
                 "Plan Name:", nameField,
                 "Plan Type:", typeCombo,
-                "Discount Percent:", percentField,
+                "Discount %:", discountField,
                 "Notes:", notesField
         };
 
-        int result = JOptionPane.showConfirmDialog(
-                this,
-                fields,
-                "Add Discount Plan",
-                JOptionPane.OK_CANCEL_OPTION
-        );
-
-        if (result != JOptionPane.OK_OPTION) {
-            return;
-        }
+        int result = JOptionPane.showConfirmDialog(this, fields, "Add Discount Plan", JOptionPane.OK_CANCEL_OPTION);
+        if (result != JOptionPane.OK_OPTION) return;
 
         try {
             DiscountPlan plan = new DiscountPlan(
                     0,
                     nameField.getText().trim(),
-                    typeCombo.getSelectedItem().toString(),
-                    Double.parseDouble(percentField.getText().trim()),
+                    (String) typeCombo.getSelectedItem(),
+                    Double.parseDouble(discountField.getText().trim()),
                     notesField.getText().trim()
             );
 
             if (!DiscountPlanDB.addPlan(plan)) {
-                JOptionPane.showMessageDialog(this, "Failed to add discount plan.");
+                JOptionPane.showMessageDialog(this, "Could not add the discount plan.");
             }
-
         } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Please enter a valid discount percent.");
+            JOptionPane.showMessageDialog(this, "Please enter a valid discount percentage.");
         }
     }
 
-    private static class StatusCellRenderer extends DefaultTableCellRenderer {
+    private void configureTable(JTable table) {
+        table.setRowHeight(44);
+        table.setShowGrid(true);
+        table.setIntercellSpacing(new Dimension(1, 1));
+        table.setFillsViewportHeight(true);
+        table.setBorder(BorderFactory.createEmptyBorder());
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.setDefaultEditor(Object.class, null);
+
+        JTableHeader header = table.getTableHeader();
+        header.setReorderingAllowed(false);
+        header.setFont(new Font("SansSerif", Font.BOLD, 13));
+        header.setBorder(BorderFactory.createEmptyBorder());
+
+        DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
+        renderer.setHorizontalAlignment(SwingConstants.LEFT);
+        renderer.setBorder(new EmptyBorder(0, 10, 0, 10));
+        table.setDefaultRenderer(Object.class, renderer);
+    }
+
+    private void styleScrollPane(JScrollPane sp) {
+        sp.setBorder(BorderFactory.createEmptyBorder());
+        sp.setOpaque(true);
+        sp.setBackground(ThemeManager.tableBackground());
+        sp.getViewport().setBackground(ThemeManager.tableBackground());
+        sp.getViewport().setBorder(null);
+    }
+
+    private void applyTableTheme(JTable table) {
+        table.setBackground(ThemeManager.tableBackground());
+        table.setForeground(ThemeManager.textPrimary());
+        table.setGridColor(ThemeManager.tableGrid());
+        table.setSelectionBackground(ThemeManager.selectionBackground());
+        table.setSelectionForeground(ThemeManager.textPrimary());
+
+        JTableHeader header = table.getTableHeader();
+        if (header != null) {
+            header.setBackground(ThemeManager.tableHeaderBackground());
+            header.setForeground(ThemeManager.textPrimary());
+            header.setBorder(BorderFactory.createEmptyBorder());
+            header.setOpaque(true);
+        }
+
+        DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
+        renderer.setBackground(ThemeManager.tableBackground());
+        renderer.setForeground(ThemeManager.textPrimary());
+        renderer.setHorizontalAlignment(SwingConstants.LEFT);
+        renderer.setBorder(new EmptyBorder(0, 10, 0, 10));
+        table.setDefaultRenderer(Object.class, renderer);
+    }
+
+    private JButton createActionButton(String text, boolean primary) {
+        RoundedActionButton button = new RoundedActionButton(text);
+        button.setFocusPainted(false);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        button.setFont(new Font("SansSerif", Font.BOLD, 13));
+        button.setHorizontalAlignment(SwingConstants.CENTER);
+        button.setContentAreaFilled(false);
+        button.setOpaque(false);
+        button.setBorder(BorderFactory.createEmptyBorder(12, 20, 12, 20));
+        button.setMargin(new Insets(0, 0, 0, 0));
+        restyleActionButton(button, primary);
+        return button;
+    }
+
+    private void restyleActionButton(JButton button, boolean primary) {
+        if (button == null) {
+            return;
+        }
+
+        if (primary) {
+            button.setBackground(ThemeManager.buttonDark());
+            button.setForeground(ThemeManager.textLight());
+            button.putClientProperty("outlineColor", ThemeManager.buttonDark());
+        } else {
+            button.setBackground(ThemeManager.buttonLight());
+            button.setForeground(ThemeManager.textPrimary());
+            button.putClientProperty("outlineColor", ThemeManager.borderColor());
+        }
+    }
+
+    private void styleCombo(JComboBox<String> comboBox) {
+        comboBox.setBackground(ThemeManager.comboBackground());
+        comboBox.setForeground(ThemeManager.comboForeground());
+        comboBox.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(ThemeManager.borderColor()),
+                new EmptyBorder(6, 10, 6, 10)
+        ));
+        comboBox.setFocusable(false);
+        comboBox.setFont(new Font("SansSerif", Font.PLAIN, 13));
+    }
+
+    private void styleField(JTextField field) {
+        field.setBackground(ThemeManager.fieldBackground());
+        field.setForeground(ThemeManager.fieldForeground());
+        field.setCaretColor(ThemeManager.fieldForeground());
+        field.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        field.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(ThemeManager.borderColor()),
+                new EmptyBorder(10, 12, 10, 12)
+        ));
+    }
+
+    @Override
+    public void applyTheme() {
+        setBackground(ThemeManager.appBackground());
+
+        if (contentPanel != null) contentPanel.setBackground(ThemeManager.appBackground());
+        if (topControls != null) topControls.setBackground(ThemeManager.appBackground());
+        if (bottomControls != null) bottomControls.setBackground(ThemeManager.appBackground());
+        if (tableCard != null) tableCard.setBackground(ThemeManager.panelBackground());
+
+        if (table != null) applyTableTheme(table);
+        if (scrollPane != null) styleScrollPane(scrollPane);
+
+        if (searchCustomerBtn != null) restyleActionButton(searchCustomerBtn, true);
+        if (addCustomerBtn != null) restyleActionButton(addCustomerBtn, true);
+        if (changeStatusBtn != null) restyleActionButton(changeStatusBtn, false);
+        if (recordPaymentBtn != null) restyleActionButton(recordPaymentBtn, false);
+        if (refreshBtn != null) restyleActionButton(refreshBtn, false);
+
+        if (searchField != null) styleField(searchField);
+        if (filterCombo != null) styleCombo(filterCombo);
+        if (sortCombo != null) styleCombo(sortCombo);
+
+        repaint();
+        revalidate();
+    }
+
+    private static class RoundedActionButton extends JButton {
+        public RoundedActionButton(String text) {
+            super(text);
+            setContentAreaFilled(false);
+            setFocusPainted(false);
+            setBorderPainted(false);
+            setOpaque(false);
+            setRolloverEnabled(true);
+        }
+
         @Override
-        public Component getTableCellRendererComponent(
-                JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column
-        ) {
-            JLabel label = (JLabel) super.getTableCellRendererComponent(
-                    table, value, isSelected, hasFocus, row, column
-            );
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-            label.setHorizontalAlignment(SwingConstants.CENTER);
-            label.setFont(new Font("SansSerif", Font.BOLD, 12));
-
-            String status = value == null ? "" : value.toString();
-
-            if (!isSelected) {
-                label.setForeground(Color.BLACK);
-
-                switch (status) {
-                    case "Active" -> label.setBackground(new Color(201, 224, 98));
-                    case "Suspended" -> label.setBackground(new Color(240, 205, 90));
-                    case "In Default" -> label.setBackground(new Color(234, 105, 90));
-                    default -> label.setBackground(Color.WHITE);
-                }
+            Color fill = getBackground();
+            if (getModel().isPressed()) {
+                fill = fill.darker();
+            } else if (getModel().isRollover()) {
+                fill = adjust(fill, 8);
             }
 
-            return label;
+            g2.setColor(fill);
+            g2.fillRoundRect(0, 0, getWidth(), getHeight(), 26, 26);
+            g2.dispose();
+
+            super.paintComponent(g);
+        }
+
+        @Override
+        protected void paintBorder(Graphics g) {
+            Object value = getClientProperty("outlineColor");
+            Color outline = value instanceof Color ? (Color) value : new Color(210, 210, 210);
+
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(outline);
+            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 26, 26);
+            g2.dispose();
+        }
+
+        private Color adjust(Color c, int amount) {
+            int r = Math.min(255, c.getRed() + amount);
+            int g = Math.min(255, c.getGreen() + amount);
+            int b = Math.min(255, c.getBlue() + amount);
+            return new Color(r, g, b, c.getAlpha());
         }
     }
 }

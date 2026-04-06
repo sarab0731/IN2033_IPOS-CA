@@ -9,292 +9,218 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
 import java.awt.*;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public class OrdersPanel extends JPanel {
+public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
+
+    private final ScreenRouter router;
+
+    private JPanel contentPanel;
+    private JPanel topTabBar;
+    private JPanel controlsPanel;
+    private JPanel leftCard;
+    private JPanel rightCard;
+    private JPanel bottomBar;
+
+    private JTable productsTable;
+    private JTable summaryTable;
+
+    private JScrollPane productsScrollPane;
+    private JScrollPane summaryScrollPane;
+
+    private JButton addToOrderBtn;
+    private JButton removeItemBtn;
+    private JButton clearOrderBtn;
+    private JButton placeOrderBtn;
+    private JButton placeNewOrderTab;
+    private JButton orderHistoryTab;
+
+    private JLabel availableProductsLabel;
+    private JLabel orderSummaryLabel;
+    private JLabel merchantIdLabel;
+    private JLabel merchantIdValue;
+    private JLabel totalLabel;
+
+    private DefaultTableModel productsModel;
+    private DefaultTableModel summaryModel;
 
     private final Map<Product, Integer> cart = new LinkedHashMap<>();
 
-    private DefaultTableModel catalogueModel;
-    private DefaultTableModel cartModel;
-    private DefaultTableModel ordersModel;
-
-    private JTable catalogueTable;
-    private JTable cartTable;
-    private JTable ordersTable;
-
-    private JLabel totalLabel;
-    private JTextField merchantField;
-    private JComboBox<String> historyFilterCombo;
-
-    private static final String[] STATUS_FLOW = {"ACCEPTED", "PROCESSED", "DISPATCHED", "DELIVERED"};
-
     public OrdersPanel(ScreenRouter router) {
-        setLayout(new BorderLayout());
-        setBackground(new Color(242, 242, 242));
+        this.router = router;
 
-        JPanel ordersContent = buildOrdersContent();
+        setLayout(new BorderLayout());
+        ThemeManager.register(this);
 
         AppShell shell = new AppShell(
                 router,
                 MainFrame.SCREEN_ORDERS,
                 "Order Management",
                 "Place and track restock orders",
-                ordersContent
+                buildContent()
         );
 
         add(shell, BorderLayout.CENTER);
+        wireActions();
+        loadCatalogue();
+        applyTheme();
+    }
+
+    private JPanel buildContent() {
+        contentPanel = new JPanel(new BorderLayout(20, 20));
+        contentPanel.setBorder(new EmptyBorder(8, 8, 8, 8));
+        contentPanel.setOpaque(true);
+
+        topTabBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 18, 0));
+        topTabBar.setOpaque(false);
+
+        placeNewOrderTab = createRestockStyleButton("Place New Order", false);
+        orderHistoryTab = createRestockStyleButton("Order History", false);
+
+        topTabBar.add(placeNewOrderTab);
+        topTabBar.add(orderHistoryTab);
+
+        controlsPanel = new JPanel(new BorderLayout(20, 0));
+        controlsPanel.setOpaque(false);
+
+        JPanel leftButtons = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        leftButtons.setOpaque(false);
+
+        addToOrderBtn = createRestockStyleButton("+  Add To Order", true);
+        removeItemBtn = createRestockStyleButton("Remove Item", false);
+
+        leftButtons.add(addToOrderBtn);
+        leftButtons.add(removeItemBtn);
+
+        JPanel rightMerchant = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        rightMerchant.setOpaque(false);
+
+        merchantIdLabel = new JLabel("Merchant ID:");
+        merchantIdValue = new JLabel("MERCHANT-001");
+        merchantIdValue.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(ThemeManager.borderColor()),
+                new EmptyBorder(10, 14, 10, 14)
+        ));
+
+        rightMerchant.add(merchantIdLabel);
+        rightMerchant.add(merchantIdValue);
+
+        controlsPanel.add(leftButtons, BorderLayout.WEST);
+        controlsPanel.add(rightMerchant, BorderLayout.EAST);
+
+        JPanel centerSection = new JPanel(new GridLayout(1, 2, 20, 0));
+        centerSection.setOpaque(false);
+
+        leftCard = AppShell.createCard();
+        leftCard.setLayout(new BorderLayout(12, 12));
+        availableProductsLabel = new JLabel("Available Products");
+        availableProductsLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
+
+        rightCard = AppShell.createCard();
+        rightCard.setLayout(new BorderLayout(12, 12));
+        orderSummaryLabel = new JLabel("Order Summary");
+        orderSummaryLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
+
+        productsModel = new DefaultTableModel(
+                new String[]{"ID", "Item ID", "Description", "Price £", "Stock", "Min Stock"}, 0
+        ) {
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
+        };
+        productsTable = new JTable(productsModel);
+
+        summaryModel = new DefaultTableModel(
+                new String[]{"Description", "Qty", "Unit Cost £", "Line Total £"}, 0
+        ) {
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
+        };
+        summaryTable = new JTable(summaryModel);
+
+        configureTable(productsTable);
+        configureTable(summaryTable);
+
+        productsScrollPane = new JScrollPane(productsTable);
+        summaryScrollPane = new JScrollPane(summaryTable);
+
+        styleScrollPane(productsScrollPane);
+        styleScrollPane(summaryScrollPane);
+
+        leftCard.add(availableProductsLabel, BorderLayout.NORTH);
+        leftCard.add(productsScrollPane, BorderLayout.CENTER);
+
+        JPanel rightInner = new JPanel(new BorderLayout(12, 12));
+        rightInner.setOpaque(false);
+        rightInner.add(orderSummaryLabel, BorderLayout.NORTH);
+        rightInner.add(summaryScrollPane, BorderLayout.CENTER);
+
+        totalLabel = new JLabel("Total: £0.00");
+        totalLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
+        JPanel totalWrap = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        totalWrap.setOpaque(false);
+        totalWrap.add(totalLabel);
+        rightInner.add(totalWrap, BorderLayout.SOUTH);
+
+        rightCard.add(rightInner, BorderLayout.CENTER);
+
+        centerSection.add(leftCard);
+        centerSection.add(rightCard);
+
+        bottomBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        bottomBar.setOpaque(false);
+
+        clearOrderBtn = createRestockStyleButton("Clear Order", false);
+        placeOrderBtn = createRestockStyleButton("Place Order", true);
+
+        bottomBar.add(clearOrderBtn);
+        bottomBar.add(placeOrderBtn);
+
+        JPanel wrapper = new JPanel(new BorderLayout(20, 20));
+        wrapper.setOpaque(false);
+        wrapper.add(controlsPanel, BorderLayout.NORTH);
+        wrapper.add(centerSection, BorderLayout.CENTER);
+        wrapper.add(bottomBar, BorderLayout.SOUTH);
+
+        contentPanel.add(topTabBar, BorderLayout.NORTH);
+        contentPanel.add(wrapper, BorderLayout.CENTER);
+
+        return contentPanel;
+    }
+
+    private void wireActions() {
+        addToOrderBtn.addActionListener(e -> addSelectedProduct());
+        removeItemBtn.addActionListener(e -> removeSelectedSummaryItem());
+        clearOrderBtn.addActionListener(e -> clearOrder());
+        placeOrderBtn.addActionListener(e -> placeOrder());
+
+        placeNewOrderTab.addActionListener(e ->
+                JOptionPane.showMessageDialog(this, "You are already on Place New Order.")
+        );
+
+        orderHistoryTab.addActionListener(e -> showOrderHistoryDialog());
 
         addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
             public void componentShown(java.awt.event.ComponentEvent e) {
                 loadCatalogue();
-                loadOrderHistory();
-                clearCart();
             }
         });
-    }
-
-    private JPanel buildOrdersContent() {
-        JPanel outer = new JPanel(new BorderLayout());
-        outer.setOpaque(false);
-
-        JTabbedPane tabs = new JTabbedPane();
-        tabs.addTab("Place New Order", buildNewOrderTab());
-        tabs.addTab("Order History", buildOrderHistoryTab());
-
-        outer.add(tabs, BorderLayout.CENTER);
-        return outer;
-    }
-
-    private JPanel buildNewOrderTab() {
-        JPanel outer = new JPanel(new BorderLayout());
-        outer.setOpaque(false);
-
-        JPanel card = AppShell.createCard();
-        card.setLayout(new BorderLayout(0, 18));
-        card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(232, 232, 232)),
-                new EmptyBorder(20, 20, 20, 20)
-        ));
-
-        card.add(buildOrderTopBar(), BorderLayout.NORTH);
-        card.add(buildOrderTablesSection(), BorderLayout.CENTER);
-        card.add(buildOrderFooter(), BorderLayout.SOUTH);
-
-        outer.add(card, BorderLayout.CENTER);
-        return outer;
-    }
-
-    private JPanel buildOrderTopBar() {
-        JPanel top = new JPanel(new BorderLayout());
-        top.setOpaque(false);
-
-        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        left.setOpaque(false);
-
-        JButton addBtn = buildDarkButton("+  Add To Order");
-        JButton removeBtn = buildLightButton("Remove Item");
-
-        addBtn.addActionListener(e -> addSelectedProductToCart());
-        removeBtn.addActionListener(e -> removeSelectedCartItem());
-
-        left.add(addBtn);
-        left.add(removeBtn);
-
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        right.setOpaque(false);
-
-        right.add(new JLabel("Merchant ID:"));
-
-        merchantField = new JTextField("MERCHANT-001", 14);
-        merchantField.setPreferredSize(new Dimension(160, 32));
-        merchantField.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(220, 220, 220)),
-                new EmptyBorder(6, 10, 6, 10)
-        ));
-
-        right.add(merchantField);
-
-        top.add(left, BorderLayout.WEST);
-        top.add(right, BorderLayout.EAST);
-
-        return top;
-    }
-
-    private JPanel buildOrderTablesSection() {
-        JPanel center = new JPanel(new GridLayout(1, 2, 18, 18));
-        center.setOpaque(false);
-
-        center.add(buildCataloguePanel());
-        center.add(buildCartPanel());
-
-        return center;
-    }
-
-    private JPanel buildCataloguePanel() {
-        JPanel panel = buildInnerCard("Available Products");
-
-        String[] columns = {"ID", "Item ID", "Description", "Price £", "Stock", "Min Stock"};
-        catalogueModel = new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int r, int c) {
-                return false;
-            }
-        };
-
-        catalogueTable = new JTable(catalogueModel);
-        styleTable(catalogueTable);
-
-        JScrollPane scrollPane = new JScrollPane(catalogueTable);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-
-        panel.add(scrollPane, BorderLayout.CENTER);
-        return panel;
-    }
-
-    private JPanel buildCartPanel() {
-        JPanel panel = buildInnerCard("Order Summary");
-
-        String[] columns = {"Description", "Qty", "Unit Cost £", "Line Total £"};
-        cartModel = new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int r, int c) {
-                return false;
-            }
-        };
-
-        cartTable = new JTable(cartModel);
-        styleTable(cartTable);
-
-        totalLabel = new JLabel("Total: £0.00", SwingConstants.RIGHT);
-        totalLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
-        totalLabel.setForeground(new Color(35, 35, 35));
-
-        JScrollPane scrollPane = new JScrollPane(cartTable);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-
-        panel.add(scrollPane, BorderLayout.CENTER);
-        panel.add(totalLabel, BorderLayout.SOUTH);
-
-        return panel;
-    }
-
-    private JPanel buildOrderFooter() {
-        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        footer.setOpaque(false);
-
-        JButton clearBtn = buildLightButton("Clear Order");
-        JButton placeBtn = buildDarkButton("Place Order");
-
-        clearBtn.addActionListener(e -> clearCart());
-
-        placeBtn.addActionListener(e -> {
-            if (cart.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Order is empty.");
-                return;
-            }
-
-            String merchantId = merchantField.getText().trim();
-            if (merchantId.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Please enter a merchant ID.");
-                return;
-            }
-
-            String orderNumber = RestockOrderDB.placeOrder(merchantId, cart);
-            if (orderNumber != null) {
-                JOptionPane.showMessageDialog(
-                        this,
-                        "Order placed successfully.\nOrder number: " + orderNumber
-                );
-                clearCart();
-                loadOrderHistory();
-            } else {
-                JOptionPane.showMessageDialog(this, "Failed to place order. Please try again.");
-            }
-        });
-
-        footer.add(clearBtn);
-        footer.add(placeBtn);
-
-        return footer;
-    }
-
-    private JPanel buildOrderHistoryTab() {
-        JPanel outer = new JPanel(new BorderLayout());
-        outer.setOpaque(false);
-
-        JPanel card = AppShell.createCard();
-        card.setLayout(new BorderLayout(0, 18));
-        card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(232, 232, 232)),
-                new EmptyBorder(20, 20, 20, 20)
-        ));
-
-        JPanel top = new JPanel(new BorderLayout());
-        top.setOpaque(false);
-
-        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        left.setOpaque(false);
-        JLabel title = new JLabel("Order History");
-        title.setFont(new Font("SansSerif", Font.BOLD, 16));
-        left.add(title);
-
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        right.setOpaque(false);
-
-        historyFilterCombo = new JComboBox<>(new String[]{
-                "All Orders", "Accepted", "Processed", "Dispatched", "Delivered"
-        });
-        styleCombo(historyFilterCombo);
-        historyFilterCombo.addActionListener(e -> loadOrderHistory());
-
-        JButton updateBtn = buildLightButton("Update Status");
-        JButton refreshBtn = buildLightButton("Refresh");
-
-        updateBtn.addActionListener(e -> updateSelectedOrderStatus());
-        refreshBtn.addActionListener(e -> loadOrderHistory());
-
-        right.add(historyFilterCombo);
-        right.add(updateBtn);
-        right.add(refreshBtn);
-
-        top.add(left, BorderLayout.WEST);
-        top.add(right, BorderLayout.EAST);
-
-        String[] cols = {"ID", "Order Number", "Merchant ID", "Status", "Total £", "Created At"};
-        ordersModel = new DefaultTableModel(cols, 0) {
-            @Override
-            public boolean isCellEditable(int r, int c) {
-                return false;
-            }
-        };
-
-        ordersTable = new JTable(ordersModel);
-        styleTable(ordersTable);
-        ordersTable.getColumnModel().getColumn(3).setCellRenderer(new StatusCellRenderer());
-
-        JScrollPane scrollPane = new JScrollPane(ordersTable);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-
-        card.add(top, BorderLayout.NORTH);
-        card.add(scrollPane, BorderLayout.CENTER);
-
-        outer.add(card, BorderLayout.CENTER);
-        return outer;
     }
 
     private void loadCatalogue() {
-        if (catalogueModel == null) {
-            return;
-        }
+        productsModel.setRowCount(0);
+        List<Product> products = ProductDB.getAllProducts();
 
-        catalogueModel.setRowCount(0);
-        for (Product p : ProductDB.getAllProducts()) {
-            catalogueModel.addRow(new Object[]{
+        for (Product p : products) {
+            productsModel.addRow(new Object[]{
                     p.getProductId(),
                     p.getItemId(),
                     p.getDescription(),
@@ -305,20 +231,19 @@ public class OrdersPanel extends JPanel {
         }
     }
 
-    private void addSelectedProductToCart() {
-        int row = catalogueTable.getSelectedRow();
+    private void addSelectedProduct() {
+        int row = productsTable.getSelectedRow();
         if (row == -1) {
             JOptionPane.showMessageDialog(this, "Please select a product.");
             return;
         }
 
-        int productId = (int) catalogueModel.getValueAt(row, 0);
-        Product product = ProductDB.getAllProducts().stream()
-                .filter(p -> p.getProductId() == productId)
-                .findFirst()
-                .orElse(null);
+        int modelRow = productsTable.convertRowIndexToModel(row);
+        int productId = (int) productsModel.getValueAt(modelRow, 0);
+        Product product = ProductDB.getById(productId);
 
         if (product == null) {
+            JOptionPane.showMessageDialog(this, "Could not load the selected product.");
             return;
         }
 
@@ -334,40 +259,35 @@ public class OrdersPanel extends JPanel {
             }
 
             cart.merge(product, qty, Integer::sum);
-            refreshCart();
-
+            refreshSummary();
         } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Please enter a valid quantity.");
+            JOptionPane.showMessageDialog(this, "Please enter a valid positive quantity.");
         }
     }
 
-    private void removeSelectedCartItem() {
-        int row = cartTable.getSelectedRow();
+    private void removeSelectedSummaryItem() {
+        int row = summaryTable.getSelectedRow();
         if (row == -1) {
             JOptionPane.showMessageDialog(this, "Please select an item to remove.");
             return;
         }
 
-        Product key = (Product) cart.keySet().toArray()[row];
+        Product key = (Product) cart.keySet().toArray()[summaryTable.convertRowIndexToModel(row)];
         cart.remove(key);
-        refreshCart();
+        refreshSummary();
     }
 
-    private void refreshCart() {
-        if (cartModel == null) {
-            return;
-        }
+    private void refreshSummary() {
+        summaryModel.setRowCount(0);
+        double total = 0.0;
 
-        cartModel.setRowCount(0);
-
-        double total = 0;
         for (Map.Entry<Product, Integer> entry : cart.entrySet()) {
             Product p = entry.getKey();
             int qty = entry.getValue();
             double lineTotal = p.getPrice() * qty;
             total += lineTotal;
 
-            cartModel.addRow(new Object[]{
+            summaryModel.addRow(new Object[]{
                     p.getDescription(),
                     qty,
                     String.format("%.2f", p.getPrice()),
@@ -378,179 +298,319 @@ public class OrdersPanel extends JPanel {
         totalLabel.setText("Total: £" + String.format("%.2f", total));
     }
 
-    private void clearCart() {
+    private void clearOrder() {
         cart.clear();
-        refreshCart();
-        if (merchantField != null) {
-            merchantField.setText("MERCHANT-001");
-        }
+        refreshSummary();
     }
 
-    private void loadOrderHistory() {
-        if (ordersModel == null) {
+    private void placeOrder() {
+        if (cart.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Order is empty.");
             return;
         }
 
-        ordersModel.setRowCount(0);
-        List<RestockOrder> orders = RestockOrderDB.getAllOrders();
+        String merchantId = JOptionPane.showInputDialog(this, "Merchant ID:", merchantIdValue.getText());
+        if (merchantId == null || merchantId.trim().isEmpty()) {
+            return;
+        }
 
-        String filter = historyFilterCombo != null ? (String) historyFilterCombo.getSelectedItem() : "All Orders";
+        merchantId = merchantId.trim();
+        merchantIdValue.setText(merchantId);
 
-        for (RestockOrder o : orders) {
-            if (!"All Orders".equals(filter) && !o.getStatus().equalsIgnoreCase(filter)) {
-                continue;
+        String orderNumber = RestockOrderDB.placeOrder(merchantId, cart);
+
+        if (orderNumber != null) {
+            JOptionPane.showMessageDialog(this, "Order placed successfully.\nOrder number: " + orderNumber);
+            clearOrder();
+            loadCatalogue();
+        } else {
+            JOptionPane.showMessageDialog(this, "Failed to place order.");
+        }
+    }
+
+    private void showOrderHistoryDialog() {
+        DefaultTableModel historyModel = new DefaultTableModel(
+                new String[]{"ID", "Order Number", "Merchant ID", "Status", "Total £", "Created At"}, 0
+        ) {
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
+        };
+
+        JTable historyTable = new JTable(historyModel);
+        configureTable(historyTable);
+        applyTableTheme(historyTable);
+
+        JScrollPane historyScroll = new JScrollPane(historyTable);
+        styleScrollPane(historyScroll);
+
+        loadOrderHistory(historyModel);
+
+        JButton refreshHistoryBtn = createRestockStyleButton("Refresh", false);
+        JButton updateStatusBtn = createRestockStyleButton("Update Status", true);
+
+        JPanel panel = new JPanel(new BorderLayout(12, 12));
+        panel.setBorder(new EmptyBorder(12, 12, 12, 12));
+        panel.setBackground(ThemeManager.panelBackground());
+        panel.add(historyScroll, BorderLayout.CENTER);
+
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        buttons.setOpaque(false);
+        buttons.add(refreshHistoryBtn);
+        buttons.add(updateStatusBtn);
+        panel.add(buttons, BorderLayout.SOUTH);
+
+        JDialog dialog = new JDialog(
+                SwingUtilities.getWindowAncestor(this),
+                "Order History",
+                Dialog.ModalityType.APPLICATION_MODAL
+        );
+        dialog.setContentPane(panel);
+        dialog.setSize(850, 420);
+        dialog.setLocationRelativeTo(this);
+
+        refreshHistoryBtn.addActionListener(e -> loadOrderHistory(historyModel));
+
+        updateStatusBtn.addActionListener(e -> {
+            int row = historyTable.getSelectedRow();
+            if (row == -1) {
+                JOptionPane.showMessageDialog(dialog, "Please select an order.");
+                return;
             }
 
-            ordersModel.addRow(new Object[]{
-                    o.getRestockOrderId(),
-                    o.getOrderNumber(),
-                    o.getMerchantId(),
-                    o.getStatus(),
-                    String.format("%.2f", o.getTotalValue()),
-                    o.getCreatedAt()
+            int modelRow = historyTable.convertRowIndexToModel(row);
+            int orderId = (int) historyModel.getValueAt(modelRow, 0);
+            String currentStatus = String.valueOf(historyModel.getValueAt(modelRow, 3));
+            String nextStatus = getNextStatus(currentStatus);
+
+            if (nextStatus == null) {
+                JOptionPane.showMessageDialog(dialog, "This order is already delivered.");
+                return;
+            }
+
+            int confirm = JOptionPane.showConfirmDialog(
+                    dialog,
+                    "Update status from " + currentStatus + " to " + nextStatus + "?",
+                    "Confirm status change",
+                    JOptionPane.YES_NO_OPTION
+            );
+
+            if (confirm == JOptionPane.YES_OPTION) {
+                RestockOrderDB.updateStatus(orderId, currentStatus, nextStatus);
+                loadOrderHistory(historyModel);
+                loadCatalogue();
+            }
+        });
+
+        dialog.setVisible(true);
+    }
+
+    private void loadOrderHistory(DefaultTableModel historyModel) {
+        historyModel.setRowCount(0);
+
+        for (RestockOrder order : RestockOrderDB.getAllOrders()) {
+            historyModel.addRow(new Object[]{
+                    order.getRestockOrderId(),
+                    order.getOrderNumber(),
+                    order.getMerchantId(),
+                    order.getStatus(),
+                    String.format("%.2f", order.getTotalValue()),
+                    order.getCreatedAt()
             });
         }
     }
 
-    private void updateSelectedOrderStatus() {
-        int row = ordersTable.getSelectedRow();
-        if (row == -1) {
-            JOptionPane.showMessageDialog(this, "Please select an order.");
-            return;
-        }
-
-        int orderId = (int) ordersModel.getValueAt(row, 0);
-        String curStatus = (String) ordersModel.getValueAt(row, 3);
-
-        String nextStatus = getNextStatus(curStatus);
-        if (nextStatus == null) {
-            JOptionPane.showMessageDialog(this, "This order is already delivered.");
-            return;
-        }
-
-        int confirm = JOptionPane.showConfirmDialog(
-                this,
-                "Update status from " + curStatus + " to " + nextStatus + "?",
-                "Confirm",
-                JOptionPane.YES_NO_OPTION
-        );
-
-        if (confirm == JOptionPane.YES_OPTION) {
-            RestockOrderDB.updateStatus(orderId, curStatus, nextStatus);
-            loadOrderHistory();
-        }
-    }
-
     private String getNextStatus(String current) {
-        for (int i = 0; i < STATUS_FLOW.length; i++) {
-            if (STATUS_FLOW[i].equalsIgnoreCase(current)) {
-                if (i == STATUS_FLOW.length - 1) {
-                    return null;
-                }
-                return STATUS_FLOW[i + 1];
-            }
-        }
-        return null;
+        return switch (current) {
+            case "ACCEPTED" -> "PROCESSED";
+            case "PROCESSED" -> "DISPATCHED";
+            case "DISPATCHED" -> "DELIVERED";
+            default -> null;
+        };
     }
 
-    private JPanel buildInnerCard(String titleText) {
-        JPanel panel = new JPanel(new BorderLayout(0, 12));
-        panel.setOpaque(false);
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(235, 235, 235)),
-                new EmptyBorder(12, 12, 12, 12)
-        ));
-        panel.setBackground(Color.WHITE);
-
-        JLabel title = new JLabel(titleText);
-        title.setFont(new Font("SansSerif", Font.BOLD, 16));
-        title.setForeground(new Color(35, 35, 35));
-
-        panel.add(title, BorderLayout.NORTH);
-        return panel;
-    }
-
-    private void styleTable(JTable table) {
+    private void configureTable(JTable table) {
+        table.setRowHeight(44);
+        table.setShowGrid(true);
+        table.setIntercellSpacing(new Dimension(1, 1));
+        table.setFillsViewportHeight(true);
+        table.setBorder(BorderFactory.createEmptyBorder());
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        table.setRowHeight(38);
-        table.setShowGrid(false);
-        table.setIntercellSpacing(new Dimension(0, 0));
-        table.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        table.setForeground(new Color(35, 35, 35));
-        table.setSelectionBackground(new Color(235, 235, 235));
-        table.setSelectionForeground(new Color(35, 35, 35));
-        table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
-        table.getTableHeader().setReorderingAllowed(false);
+        table.setDefaultEditor(Object.class, null);
+
+        JTableHeader header = table.getTableHeader();
+        header.setReorderingAllowed(false);
+        header.setFont(new Font("SansSerif", Font.BOLD, 13));
+        header.setBorder(BorderFactory.createEmptyBorder());
+
+        DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
+        renderer.setHorizontalAlignment(SwingConstants.LEFT);
+        renderer.setBorder(new EmptyBorder(0, 10, 0, 10));
+        table.setDefaultRenderer(Object.class, renderer);
     }
 
-    private JButton buildDarkButton(String text) {
-        JButton btn = new JButton(text);
-        btn.setFocusPainted(false);
-        btn.setBorderPainted(false);
-        btn.setContentAreaFilled(true);
-        btn.setOpaque(true);
-        btn.setBackground(new Color(30, 32, 38));
-        btn.setForeground(Color.WHITE);
-        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setBorder(new EmptyBorder(9, 16, 9, 16));
-        return btn;
+    private void styleScrollPane(JScrollPane sp) {
+        sp.setBorder(BorderFactory.createEmptyBorder());
+        sp.setOpaque(true);
+        sp.setBackground(ThemeManager.tableBackground());
+        sp.getViewport().setBackground(ThemeManager.tableBackground());
+        sp.getViewport().setBorder(null);
     }
 
-    private JButton buildLightButton(String text) {
-        JButton btn = new JButton(text);
-        btn.setFocusPainted(false);
-        btn.setContentAreaFilled(true);
-        btn.setOpaque(true);
-        btn.setBackground(Color.WHITE);
-        btn.setForeground(new Color(45, 45, 45));
-        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(220, 220, 220)),
-                new EmptyBorder(9, 16, 9, 16)
-        ));
-        return btn;
+    private void applyTableTheme(JTable table) {
+        table.setBackground(ThemeManager.tableBackground());
+        table.setForeground(ThemeManager.textPrimary());
+        table.setGridColor(ThemeManager.tableGrid());
+        table.setSelectionBackground(ThemeManager.selectionBackground());
+        table.setSelectionForeground(ThemeManager.textPrimary());
+
+        JTableHeader header = table.getTableHeader();
+        if (header != null) {
+            header.setBackground(ThemeManager.tableHeaderBackground());
+            header.setForeground(ThemeManager.textPrimary());
+            header.setBorder(BorderFactory.createEmptyBorder());
+            header.setOpaque(true);
+        }
+
+        DefaultTableCellRenderer renderer = new DefaultTableCellRenderer();
+        renderer.setBackground(ThemeManager.tableBackground());
+        renderer.setForeground(ThemeManager.textPrimary());
+        renderer.setHorizontalAlignment(SwingConstants.LEFT);
+        renderer.setBorder(new EmptyBorder(0, 10, 0, 10));
+        table.setDefaultRenderer(Object.class, renderer);
     }
 
-    private void styleCombo(JComboBox<String> combo) {
-        combo.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        combo.setBackground(Color.WHITE);
-        combo.setForeground(new Color(80, 80, 80));
-        combo.setFocusable(false);
-        combo.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(220, 220, 220)),
-                new EmptyBorder(4, 8, 4, 8)
-        ));
+    private JButton createRestockStyleButton(String text, boolean primary) {
+        JButton button = new RoundedButton(text);
+        button.setFocusPainted(false);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        button.setFont(new Font("SansSerif", Font.BOLD, 13));
+        button.setHorizontalAlignment(SwingConstants.CENTER);
+        button.setContentAreaFilled(false);
+        button.setOpaque(false);
+        button.setMargin(new Insets(0, 0, 0, 0));
+        button.setBorder(BorderFactory.createEmptyBorder(12, 22, 12, 22));
+
+        if (primary) {
+            button.setBackground(ThemeManager.buttonDark());
+            button.setForeground(ThemeManager.textLight());
+            button.putClientProperty("outlineColor", ThemeManager.buttonDark());
+        } else {
+            button.setBackground(ThemeManager.buttonLight());
+            button.setForeground(ThemeManager.textPrimary());
+            button.putClientProperty("outlineColor", ThemeManager.borderColor());
+        }
+
+        return button;
     }
 
-    private static class StatusCellRenderer extends DefaultTableCellRenderer {
+    private static class RoundedButton extends JButton {
+        public RoundedButton(String text) {
+            super(text);
+            setContentAreaFilled(false);
+            setFocusPainted(false);
+            setBorderPainted(false);
+            setOpaque(false);
+            setRolloverEnabled(true);
+        }
+
         @Override
-        public Component getTableCellRendererComponent(
-                JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column
-        ) {
-            JLabel label = (JLabel) super.getTableCellRendererComponent(
-                    table, value, isSelected, hasFocus, row, column
-            );
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-            label.setHorizontalAlignment(SwingConstants.CENTER);
-            label.setFont(new Font("SansSerif", Font.BOLD, 12));
-
-            String status = value == null ? "" : value.toString();
-
-            if (!isSelected) {
-                label.setForeground(Color.BLACK);
-
-                switch (status.toUpperCase()) {
-                    case "ACCEPTED" -> label.setBackground(new Color(240, 205, 90));
-                    case "PROCESSED" -> label.setBackground(new Color(200, 225, 110));
-                    case "DISPATCHED" -> label.setBackground(new Color(140, 210, 255));
-                    case "DELIVERED" -> label.setBackground(new Color(201, 224, 98));
-                    default -> label.setBackground(Color.WHITE);
-                }
+            Color fill = getBackground();
+            if (getModel().isPressed()) {
+                fill = fill.darker();
+            } else if (getModel().isRollover()) {
+                fill = adjust(fill, 8);
             }
 
-            return label;
+            g2.setColor(fill);
+            g2.fillRoundRect(0, 0, getWidth(), getHeight(), 26, 26);
+            g2.dispose();
+
+            super.paintComponent(g);
+        }
+
+        @Override
+        protected void paintBorder(Graphics g) {
+            Object value = getClientProperty("outlineColor");
+            Color outline = value instanceof Color ? (Color) value : new Color(210, 210, 210);
+
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(outline);
+            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 26, 26);
+            g2.dispose();
+        }
+
+        private Color adjust(Color c, int amount) {
+            int r = Math.min(255, c.getRed() + amount);
+            int g = Math.min(255, c.getGreen() + amount);
+            int b = Math.min(255, c.getBlue() + amount);
+            return new Color(r, g, b, c.getAlpha());
+        }
+    }
+
+    @Override
+    public void applyTheme() {
+        setBackground(ThemeManager.appBackground());
+
+        if (contentPanel != null) contentPanel.setBackground(ThemeManager.appBackground());
+        if (topTabBar != null) topTabBar.setBackground(ThemeManager.appBackground());
+        if (controlsPanel != null) controlsPanel.setBackground(ThemeManager.appBackground());
+        if (bottomBar != null) bottomBar.setBackground(ThemeManager.appBackground());
+
+        if (leftCard != null) leftCard.setBackground(ThemeManager.panelBackground());
+        if (rightCard != null) rightCard.setBackground(ThemeManager.panelBackground());
+
+        if (availableProductsLabel != null) availableProductsLabel.setForeground(ThemeManager.textPrimary());
+        if (orderSummaryLabel != null) orderSummaryLabel.setForeground(ThemeManager.textPrimary());
+        if (merchantIdLabel != null) merchantIdLabel.setForeground(ThemeManager.textPrimary());
+
+        if (merchantIdValue != null) {
+            merchantIdValue.setForeground(ThemeManager.textPrimary());
+            merchantIdValue.setBackground(ThemeManager.fieldBackground());
+            merchantIdValue.setOpaque(true);
+            merchantIdValue.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(ThemeManager.borderColor()),
+                    new EmptyBorder(10, 14, 10, 14)
+            ));
+        }
+
+        if (totalLabel != null) totalLabel.setForeground(ThemeManager.textPrimary());
+
+        if (productsTable != null) applyTableTheme(productsTable);
+        if (summaryTable != null) applyTableTheme(summaryTable);
+        if (productsScrollPane != null) styleScrollPane(productsScrollPane);
+        if (summaryScrollPane != null) styleScrollPane(summaryScrollPane);
+
+        restyleButton(addToOrderBtn, true);
+        restyleButton(removeItemBtn, false);
+        restyleButton(clearOrderBtn, false);
+        restyleButton(placeOrderBtn, true);
+        restyleButton(placeNewOrderTab, false);
+        restyleButton(orderHistoryTab, false);
+
+        repaint();
+        revalidate();
+    }
+
+    private void restyleButton(JButton button, boolean primary) {
+        if (button == null) {
+            return;
+        }
+
+        if (primary) {
+            button.setBackground(ThemeManager.buttonDark());
+            button.setForeground(ThemeManager.textLight());
+            button.putClientProperty("outlineColor", ThemeManager.buttonDark());
+        } else {
+            button.setBackground(ThemeManager.buttonLight());
+            button.setForeground(ThemeManager.textPrimary());
+            button.putClientProperty("outlineColor", ThemeManager.borderColor());
         }
     }
 }

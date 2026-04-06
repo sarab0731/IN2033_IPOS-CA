@@ -80,4 +80,70 @@ public class UserDB {
 
         return users;
     }
+
+    public static boolean usernameExists(String username) {
+        String sql = "SELECT 1 FROM users WHERE username = ? AND is_active = 1";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, username.trim());
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return false;
+    }
+
+    public static boolean isAdmin(User user) {
+        if (user == null || user.getRole() == null) {
+            return false;
+        }
+        String role = user.getRole().trim().toLowerCase();
+        return role.equals("admin") || role.equals("administrator");
+    }
+
+    public static boolean authenticateAdmin(String username, String password) {
+        User user = authenticate(username, password);
+        return isAdmin(user);
+    }
+
+    public static boolean resetPasswordByUsername(String username, String newPassword) {
+        if (username == null || newPassword == null) {
+            return false;
+        }
+
+        username = username.trim();
+        newPassword = newPassword.trim();
+
+        if (username.isEmpty() || newPassword.isEmpty()) {
+            return false;
+        }
+
+        if (!usernameExists(username)) {
+            return false;
+        }
+
+        String sql = "UPDATE users SET password_hash = ? WHERE username = ? AND is_active = 1";
+        String newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, newHash);
+            stmt.setString(2, username);
+
+            return stmt.executeUpdate() > 0;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return false;
+    }
 }

@@ -14,6 +14,7 @@ public class ThemeManager {
         void applyTheme();
     }
 
+    // START IN DARK MODE
     private static ThemeMode currentMode = ThemeMode.LIGHT;
     private static final List<ThemeListener> listeners = new ArrayList<>();
 
@@ -55,7 +56,7 @@ public class ThemeManager {
     }
 
     public static Color innerCardBackground() {
-        return isDark() ? new Color(33, 36, 44) : Color.WHITE;
+        return isDark() ? new Color(40, 44, 52) : new Color(245, 245, 245);
     }
 
     public static Color sidebarBackground() {
