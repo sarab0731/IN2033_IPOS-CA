@@ -286,3 +286,4 @@ CREATE TABLE IF NOT EXISTS transaction_history (
     FOREIGN KEY (receipt_id) REFERENCES receipts(receipt_id)
     ON DELETE SET NULL ON UPDATE CASCADE
     );
+

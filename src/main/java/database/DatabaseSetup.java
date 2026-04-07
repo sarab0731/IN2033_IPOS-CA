@@ -7,6 +7,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
+import integration.PUSync;
 import org.mindrot.jbcrypt.BCrypt;
 
 public class DatabaseSetup {
@@ -31,6 +32,9 @@ public class DatabaseSetup {
             System.out.println("Database initialised.");
 
             seedDefaultUsers(conn);
+
+            // Sync with PU system (pull pending stock changes, push product catalog)
+            PUSync.syncWithPU();
 
         } catch (Exception e) {
             e.printStackTrace();

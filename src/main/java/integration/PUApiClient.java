@@ -33,6 +33,7 @@ public class PUApiClient {
     public static List<PUOrder> getOnlineOrders() {
         List<PUOrder> orders = new ArrayList<>();
         try {
+            System.out.println("test");
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(BASE_URL + "/api/orders/undelivered"))
                     .GET()
@@ -42,6 +43,7 @@ public class PUApiClient {
             if (response.statusCode() == 200) {
                 JSONArray arr = new JSONArray(response.body());
                 for (int i = 0; i < arr.length(); i++) {
+                    System.out.println(arr.getJSONObject(i));
                     orders.add(parseOrder(arr.getJSONObject(i)));
                 }
             }
@@ -129,6 +131,67 @@ public class PUApiClient {
             return response.statusCode() >= 200 && response.statusCode() < 300;
         } catch (Exception e) {
             System.err.println("[PUApiClient] sendEmail failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // Sync
+
+    /**
+     * Fetches pending stock changes from PU cache.
+     * Returns JSON array: [{"productId":1,"pendingChange":-5}, ...]
+     */
+    public static JSONArray getPendingStockChanges() {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(BASE_URL + "/api/sync/pending-changes"))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                return new JSONArray(response.body());
+            }
+        } catch (Exception e) {
+            System.err.println("[PUApiClient] getPendingStockChanges failed: " + e.getMessage());
+        }
+        return new JSONArray();
+    }
+
+    /**
+     * Clears all pending stock changes in PU after CA has synced.
+     */
+    public static boolean clearAllPendingChanges() {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(BASE_URL + "/api/sync/clear-all-pending"))
+                    .POST(HttpRequest.BodyPublishers.noBody())
+                    .build();
+
+            HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+            return response.statusCode() >= 200 && response.statusCode() < 300;
+        } catch (Exception e) {
+            System.err.println("[PUApiClient] clearAllPendingChanges failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Pushes CA's product catalog to PU cache.
+     */
+    public static boolean pushProductsToCache(String productsJson) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(BASE_URL + "/api/sync/update-cache"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(productsJson))
+                    .build();
+
+            HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+            System.out.println("[PUApiClient] pushProductsToCache response: " + response.body());
+            return response.statusCode() >= 200 && response.statusCode() < 300;
+        } catch (Exception e) {
+            System.err.println("[PUApiClient] pushProductsToCache failed: " + e.getMessage());
             return false;
         }
     }
