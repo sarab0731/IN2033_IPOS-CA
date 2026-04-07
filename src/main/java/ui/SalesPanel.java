@@ -7,6 +7,9 @@ import database.ProductDB;
 import database.SaleDB;
 import domain.Customer;
 import domain.Product;
+import integration.PUApiClient;
+
+import java.util.ArrayList;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -429,6 +432,53 @@ public class SalesPanel extends JPanel implements ThemeManager.ThemeListener {
         String saleType = accountSale ? "ACCOUNT" : "OCCASIONAL";
         String paymentMethod = (String) paymentMethodCombo.getSelectedItem();
 
+        // Card payment — collect card details and authorise via PU API
+        if ("CARD".equals(paymentMethod)) {
+            JTextField cardNumberField = new JTextField(16);
+            JTextField expiryField = new JTextField(5);
+            JPasswordField cvvField = new JPasswordField(4);
+
+            JPanel cardPanel = new JPanel(new GridLayout(3, 2, 8, 8));
+            cardPanel.add(new JLabel("Card Number:"));
+            cardPanel.add(cardNumberField);
+            cardPanel.add(new JLabel("Expiry (MM/YY):"));
+            cardPanel.add(expiryField);
+            cardPanel.add(new JLabel("CVV:"));
+            cardPanel.add(cvvField);
+
+            int cardChoice = JOptionPane.showConfirmDialog(
+                    this, cardPanel, "Card Payment Details", JOptionPane.OK_CANCEL_OPTION);
+            if (cardChoice != JOptionPane.OK_OPTION) return;
+
+            String cardNumber = cardNumberField.getText().trim();
+            String expiry     = expiryField.getText().trim();
+            String cvv        = new String(cvvField.getPassword()).trim();
+
+            if (cardNumber.isEmpty() || expiry.isEmpty() || cvv.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Please enter all card details.");
+                return;
+            }
+
+            double total = cart.entrySet().stream()
+                    .mapToDouble(e -> e.getKey().getPrice() * e.getValue()
+                            * (1 + e.getKey().getVatRate() / 100.0))
+                    .sum();
+
+            String result = PUApiClient.processCardPayment(cardNumber, expiry, cvv, total);
+            if ("declined".equals(result)) {
+                JOptionPane.showMessageDialog(this,
+                        "Card payment declined. Please try another payment method.",
+                        "Payment Declined", JOptionPane.WARNING_MESSAGE);
+                return;
+            } else if ("error".equals(result)) {
+                JOptionPane.showMessageDialog(this,
+                        "Could not reach the payment gateway. Please try again or use a different payment method.",
+                        "Payment Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            // "success" — fall through to record sale
+        }
+
         int saleId = SaleDB.recordSale(
                 Session.getUserId(),
                 selectedCustomer,
@@ -443,18 +493,41 @@ public class SalesPanel extends JPanel implements ThemeManager.ThemeListener {
             return;
         }
 
-        String documentNumber;
         if (accountSale) {
-            double total = cart.entrySet().stream()
-                    .mapToDouble(e -> e.getKey().getPrice() * e.getValue() * (1 + e.getKey().getVatRate() / 100.0))
+            double subtotal = cart.entrySet().stream()
+                    .mapToDouble(e -> e.getKey().getPrice() * e.getValue())
                     .sum();
+            double vatAmount = cart.entrySet().stream()
+                    .mapToDouble(e -> e.getKey().getPrice() * e.getValue()
+                            * (e.getKey().getVatRate() / 100.0))
+                    .sum();
+            double amountDue = subtotal + vatAmount;
 
-            documentNumber = SaleDB.generateInvoice(saleId, selectedCustomer.getCustomerId(), total);
-            JOptionPane.showMessageDialog(this,
-                    "Sale recorded.\nInvoice: " + documentNumber + "\nCustomer: " + selectedCustomer.getFullName());
+            String invoiceNumber = SaleDB.generateInvoice(saleId, selectedCustomer.getCustomerId(), amountDue);
+
+            int printChoice = JOptionPane.showConfirmDialog(this,
+                    "Sale recorded.\nInvoice: " + invoiceNumber
+                    + "\nCustomer: " + selectedCustomer.getFullName()
+                    + "\n\nGenerate invoice PDF?",
+                    "Sale Complete", JOptionPane.YES_NO_OPTION);
+
+            if (printChoice == JOptionPane.YES_OPTION) {
+                List<PdfGenerator.InvoiceItem> pdfItems = new ArrayList<>();
+                for (Map.Entry<Product, Integer> entry : cart.entrySet()) {
+                    Product p = entry.getKey();
+                    int qty = entry.getValue();
+                    double lineTotal = p.getPrice() * qty * (1 + p.getVatRate() / 100.0);
+                    pdfItems.add(new PdfGenerator.InvoiceItem(
+                            p.getDescription(), qty, p.getPrice(), lineTotal, p.getVatRate()));
+                }
+                PdfGenerator.generateRetailInvoice(
+                        this, selectedCustomer, invoiceNumber,
+                        pdfItems, subtotal, vatAmount, amountDue,
+                        Session.getCurrentUser().getFullName());
+            }
         } else {
-            documentNumber = SaleDB.generateReceipt(saleId);
-            JOptionPane.showMessageDialog(this, "Sale recorded.\nReceipt: " + documentNumber);
+            String receiptNumber = SaleDB.generateReceipt(saleId);
+            JOptionPane.showMessageDialog(this, "Sale recorded.\nReceipt: " + receiptNumber);
         }
 
         clearCart();
