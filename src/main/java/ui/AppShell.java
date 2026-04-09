@@ -85,13 +85,10 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         addNavButton(top, "Stock", MainFrame.SCREEN_STOCK);
         addNavButton(top, "Sales", MainFrame.SCREEN_SALES);
         addNavButton(top, "Customers", MainFrame.SCREEN_CUSTOMERS);
-        addNavButton(top, "Orders", MainFrame.SCREEN_ORDERS);
         addNavButton(top, "Online Orders", MainFrame.SCREEN_PU_ORDERS);
         addNavButton(top, "Reports", MainFrame.SCREEN_REPORTS);
         addNavButton(top, "Reminders", MainFrame.SCREEN_REMINDERS);
         addNavButton(top, "Users", MainFrame.SCREEN_USERS);
-        addNavButton(top, "Discount Plans", MainFrame.SCREEN_DISCOUNT_PLANS);
-        addNavButton(top, "Templates",      MainFrame.SCREEN_TEMPLATES);
         addNavButton(top, "Discount Plans", MainFrame.SCREEN_DISCOUNT_PLANS);
         addNavButton(top, "Templates",      MainFrame.SCREEN_TEMPLATES);
 
@@ -296,12 +293,10 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
 
         JButton reportsBtn = navButtons.get(MainFrame.SCREEN_REPORTS);
         JButton customersBtn = navButtons.get(MainFrame.SCREEN_CUSTOMERS);
-        JButton ordersBtn = navButtons.get(MainFrame.SCREEN_ORDERS);
         JButton remindersBtn = navButtons.get(MainFrame.SCREEN_REMINDERS);
         JButton usersBtn = navButtons.get(MainFrame.SCREEN_USERS);
         JButton discountBtn  = navButtons.get(MainFrame.SCREEN_DISCOUNT_PLANS);
         JButton templatesBtn = navButtons.get(MainFrame.SCREEN_TEMPLATES);
-
 
         if (reportsBtn != null) {
             reportsBtn.setVisible(user.isManager() || user.isAdmin());
@@ -311,9 +306,6 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         }
         if (customersBtn != null) {
             customersBtn.setVisible(!user.isPharmacist());
-        }
-        if (ordersBtn != null) {
-            ordersBtn.setVisible(!user.isPharmacist());
         }
         if (remindersBtn != null) {
             remindersBtn.setVisible(user.isManager() || user.isAdmin());
