@@ -10,8 +10,7 @@ public class CustomerDB {
 
     public static List<Customer> getAllActiveCustomers() {
         List<Customer> list = new ArrayList<>();
-        String sql = "SELECT * FROM customer_accounts WHERE account_status != 'DELETED' ORDER BY full_name";
-
+        String sql = "SELECT * FROM customer_accounts WHERE is_active = 1 ORDER BY full_name";
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
@@ -222,7 +221,7 @@ public class CustomerDB {
     }
 
     public static boolean deleteCustomer(int customerId) {
-        // Check for linked records before attempting delete
+        // Check for linked records
         String checkSql = """
         SELECT 
             (SELECT COUNT(*) FROM sales WHERE customer_id = ?) +
@@ -239,8 +238,8 @@ public class CustomerDB {
             ResultSet rs = check.executeQuery();
 
             if (rs.next() && rs.getInt("total") > 0) {
-                // Has linked records — soft delete instead
-                String softSql = "UPDATE customer_accounts SET account_status = 'DELETED' WHERE customer_id = ?";
+                // Soft delete — set is_active = 0
+                String softSql = "UPDATE customer_accounts SET is_active = 0 WHERE customer_id = ?";
                 try (PreparedStatement soft = conn.prepareStatement(softSql)) {
                     soft.setInt(1, customerId);
                     soft.executeUpdate();
@@ -248,7 +247,7 @@ public class CustomerDB {
                 }
             }
 
-            // No linked records — safe to hard delete
+            // No linked records — hard delete
             String deleteSql = "DELETE FROM customer_accounts WHERE customer_id = ?";
             try (PreparedStatement stmt = conn.prepareStatement(deleteSql)) {
                 stmt.setInt(1, customerId);

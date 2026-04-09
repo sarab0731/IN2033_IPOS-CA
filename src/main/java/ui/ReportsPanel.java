@@ -1,6 +1,7 @@
 
 package ui;
 
+import app.Session;
 import database.CustomerDB;
 import database.DatabaseManager;
 import database.ProductDB;
@@ -57,7 +58,6 @@ public class ReportsPanel extends JPanel implements ThemeManager.ThemeListener {
 
         add(shell, BorderLayout.CENTER);
         wireActions();
-        generateReport();
         applyTheme();
     }
 
@@ -135,6 +135,10 @@ public class ReportsPanel extends JPanel implements ThemeManager.ThemeListener {
     }
 
     private void generateReport() {
+        if (!Session.isManagerOrAdmin()) {
+            JOptionPane.showMessageDialog(this, "Only Managers and Admins can generate reports.");
+            return;
+        }
         String from = fromDateField.getText().trim();
         String to = toDateField.getText().trim();
 

@@ -144,7 +144,19 @@ public class PaymentRemindersPanel extends JPanel implements ThemeManager.ThemeL
                 if (daysPast >= 30 && !"IN_DEFAULT".equals(accountStatus)) {
                     CustomerDB.updateStatus(customerId, "IN_DEFAULT");
                     ensureReminderExists(conn, customerId, invoiceId, "SECOND");
-                } else if (daysPast >= 15 && "ACTIVE".equals(accountStatus)) {
+                }
+                if (daysPast < 15 && "SUSPENDED".equals(accountStatus)) {
+                    // Check if balance is now 0
+                    String balSql = "SELECT current_balance FROM customer_accounts WHERE customer_id = ?";
+                    try (PreparedStatement balStmt = conn.prepareStatement(balSql)) {
+                        balStmt.setInt(1, customerId);
+                        ResultSet balRs = balStmt.executeQuery();
+                        if (balRs.next() && balRs.getDouble("current_balance") == 0) {
+                            CustomerDB.updateStatus(customerId, "ACTIVE");
+                        }
+                    }
+                }
+                else if (daysPast >= 15 && "ACTIVE".equals(accountStatus)) {
                     CustomerDB.updateStatus(customerId, "SUSPENDED");
                     ensureReminderExists(conn, customerId, invoiceId, "FIRST");
                 }

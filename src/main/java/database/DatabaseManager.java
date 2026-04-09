@@ -38,7 +38,7 @@ public class DatabaseManager {
         // 3. Final fallback: hardcoded defaults so the app never refuses to start
         URL      = props.getProperty("db.url",      "jdbc:mysql://localhost:3306/IPOS-CA");
         USER     = props.getProperty("db.user",     "root");
-        PASSWORD = props.getProperty("db.password", "");
+        PASSWORD = props.getProperty("db.password", "root");
     }
 
     public static Connection getConnection() throws SQLException {

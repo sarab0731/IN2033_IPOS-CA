@@ -1,5 +1,6 @@
 package ui;
 
+import app.Session;
 import database.ProductDB;
 import database.RestockOrderDB;
 import domain.Product;
@@ -317,24 +318,52 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         bottomActionBar.add(refreshBtn);
     }
 
-    private void wireStockActions() {
-        refreshBtn.addActionListener(e -> loadStockTable());
-        orderStockBtn.addActionListener(e -> showAddDialog());
+    private void wireActions() {
+        refreshBtn.addActionListener(e -> loadTable());
+        orderStockBtn.addActionListener(e -> {
+            if (!Session.isManagerOrAdmin()) {
+                JOptionPane.showMessageDialog(this, "Only Managers and Admins can add stock.");
+                return;
+            }
+            showAddDialog();
+        });
 
         editBtn.addActionListener(e -> {
-            int i = getSelectedVisibleIndex();
-            if (i == -1) { JOptionPane.showMessageDialog(this, "Please select a product to edit."); return; }
-            showEditDialog(visibleProducts.get(i));
+            if (!Session.isManagerOrAdmin()) {
+                JOptionPane.showMessageDialog(this, "Only Managers and Admins can edit products.");
+                return;
+            }
+            int selectedIndex = getSelectedVisibleIndex();
+            if (selectedIndex == -1) {
+                JOptionPane.showMessageDialog(this, "Please select a product to edit.");
+                return;
+            }
+            showEditDialog(visibleProducts.get(selectedIndex));
         });
 
         deleteBtn.addActionListener(e -> {
-            int i = getSelectedVisibleIndex();
-            if (i == -1) { JOptionPane.showMessageDialog(this, "Please select a product to remove."); return; }
-            Product p = visibleProducts.get(i);
-            if (JOptionPane.showConfirmDialog(this, "Remove the selected product from stock?",
-                    "Confirm removal", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
-                ProductDB.deleteProduct(p.getProductId());
-                loadStockTable();
+            if (!Session.isManagerOrAdmin()) {
+                JOptionPane.showMessageDialog(this, "Only Managers and Admins can remove products.");
+                return;
+            }
+            int selectedIndex = getSelectedVisibleIndex();
+            if (selectedIndex == -1) {
+                JOptionPane.showMessageDialog(this, "Please select a product to remove.");
+                return;
+            }
+
+            Product selectedProduct = visibleProducts.get(selectedIndex);
+
+            int confirm = JOptionPane.showConfirmDialog(
+                    this,
+                    "Remove the selected product from stock?",
+                    "Confirm removal",
+                    JOptionPane.YES_NO_OPTION
+            );
+
+            if (confirm == JOptionPane.YES_OPTION) {
+                ProductDB.deleteProduct(selectedProduct.getProductId());
+                loadTable();
             }
         });
 
