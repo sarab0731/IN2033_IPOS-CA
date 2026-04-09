@@ -28,11 +28,14 @@ services:
       DB_URL: jdbc:mysql://mysql:3306/IPOS-CA
       DB_USER: root
       DB_PASSWORD: Password123
+      PU_BASE_URL: http://host.docker.internal:8080
     depends_on:
       mysql:
         condition: service_healthy
     volumes:
       - ./database:/app/database
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   mysql_data:
