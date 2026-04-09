@@ -14,7 +14,7 @@ export DISPLAY=:1
 sleep 1
 
 # Start VNC server (no password, shared so multiple viewers can connect)
-x11vnc -display :1 -nopw -listen 0.0.0.0 -port 5900 -forever -shared -quiet &
+x11vnc -display :1 -nopw -listen 0.0.0.0 -rfbport 5900 -forever -shared -quiet &
 sleep 1
 
 # Start noVNC — serves the web client and proxies to VNC on 5900
@@ -23,7 +23,7 @@ websockify --web=/usr/share/novnc/ 6080 localhost:5900 &
 echo "============================================"
 echo "  IPOS-CA GUI → http://localhost:6080/vnc.html"
 echo "  VNC direct   → localhost:5900 (no password)"
-echo "  API server   → http://localhost:8081"
+echo "  API server   → http://localhost:8082"
 echo "============================================"
 
 # Launch the application (classpath includes all Maven dependencies)

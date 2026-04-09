@@ -2,17 +2,18 @@
 FROM maven:3.9-eclipse-temurin-17 AS builder
 WORKDIR /build
 COPY pom.xml .
-RUN mvn dependency:go-offline -q
+# Pre-download dependencies for better layer caching
+RUN mvn dependency:resolve -q || true
 COPY src ./src
 RUN mvn package dependency:copy-dependencies -DskipTests -q \
     -DoutputDirectory=target/dependency
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
-FROM eclipse-temurin:17-jre-jammy
+FROM eclipse-temurin:17-jre-focal
 WORKDIR /app
 
 # Virtual display + VNC + noVNC + Java2D font/rendering libs
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN (apt-get update || apt-get update) && apt-get install -y --no-install-recommends --fix-missing \
         xvfb \
         x11vnc \
         novnc \
@@ -32,6 +33,6 @@ COPY database/ ./database/
 COPY start.sh .
 RUN chmod +x start.sh
 
-EXPOSE 5900 6080 8081
+EXPOSE 5900 6080 8082
 
 ENTRYPOINT ["./start.sh"]

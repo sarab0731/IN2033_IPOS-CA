@@ -104,7 +104,7 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         );
 
         add(shell, BorderLayout.CENTER);
-        wireStockActions();
+        wireActions();
         loadStockTable();
         applyTheme();
     }
@@ -319,7 +319,7 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
     }
 
     private void wireActions() {
-        refreshBtn.addActionListener(e -> loadTable());
+        refreshBtn.addActionListener(e -> loadStockTable());
         orderStockBtn.addActionListener(e -> {
             if (!Session.isManagerOrAdmin()) {
                 JOptionPane.showMessageDialog(this, "Only Managers and Admins can add stock.");
@@ -363,7 +363,7 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
 
             if (confirm == JOptionPane.YES_OPTION) {
                 ProductDB.deleteProduct(selectedProduct.getProductId());
-                loadTable();
+                loadStockTable();
             }
         });
 

@@ -11,7 +11,7 @@ import java.time.Duration;
 
 /**
  * HTTP client for communicating with the IPOS-SA subsystem.
- * Base URL: http://localhost:8081/
+ * Base URL: http://localhost:8082/
  *
  * SA endpoints consumed:
  *   GET  /api/inventory/catalogue
@@ -27,7 +27,7 @@ import java.time.Duration;
  */
 public class SAApiClient {
 
-    private static final String BASE_URL = "http://localhost:8081";
+    private static final String BASE_URL = "http://localhost:8082";
     private static final HttpClient HTTP = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
             .build();

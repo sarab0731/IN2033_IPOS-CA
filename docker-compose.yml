@@ -7,8 +7,7 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: Password123
       MYSQL_DATABASE: IPOS-CA
-    ports:
-      - "3306:3306"
+      MYSQL_ROOT_HOST: '%'
     volumes:
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
       - mysql_data:/var/lib/mysql
@@ -24,7 +23,7 @@ services:
     ports:
       - "6080:6080"   # noVNC web GUI (open in browser)
       - "5900:5900"   # VNC direct access
-      - "8081:8081"   # Embedded REST API
+      - "8082:8082"   # Embedded REST API
     environment:
       DB_URL: jdbc:mysql://mysql:3306/IPOS-CA
       DB_USER: root

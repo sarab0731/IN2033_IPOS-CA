@@ -20,7 +20,7 @@ import java.util.concurrent.Executors;
  * Embedded HTTP server exposing IPOS-CA stock and order-status endpoints
  * so that IPOS-PU can query and update CA data directly.
  *
- * Runs on port 8081.
+ * Runs on port 8082.
  *
  * Endpoints:
  *   GET  /api/stock/catalogue            – full product catalogue
@@ -31,7 +31,7 @@ import java.util.concurrent.Executors;
  */
 public class CAApiServer {
 
-    private static final int PORT = 8081;
+    private static final int PORT = 8082;
 
     public static void start() {
         try {

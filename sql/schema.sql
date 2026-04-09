@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS customer_accounts (
     credit_limit DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     current_balance DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     discount_plan_id INT,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CHECK (credit_limit >= 0),
