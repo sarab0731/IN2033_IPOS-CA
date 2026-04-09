@@ -17,6 +17,12 @@ public class MainFrame extends JFrame {
     public static final String SCREEN_REPORTS   = "reports";
     public static final String SCREEN_REMINDERS = "reminders";
     public static final String SCREEN_PU_ORDERS = "Online Orders";
+    public static final String SCREEN_USERS = "Users";
+    public static final String SCREEN_DISCOUNT_PLANS = "Discount Plans" ;
+    public static final String SCREEN_TEMPLATES = "Templates" ;
+
+
+
 
     public MainFrame() {
         super("IPOS-CA");
@@ -36,6 +42,10 @@ public class MainFrame extends JFrame {
         root.add(new ReportsPanel(router),          SCREEN_REPORTS);
         root.add(new PaymentRemindersPanel(router), SCREEN_REMINDERS);
         root.add(new PUOrdersPanel(router),         SCREEN_PU_ORDERS);
+        root.add(new UserPanel(router),             SCREEN_USERS);
+        root.add(new DiscountPlansPanel(router),    SCREEN_DISCOUNT_PLANS);
+        root.add(new TemplatesPanel(router),        SCREEN_TEMPLATES);
+
 
         setContentPane(root);
         router.goTo(SCREEN_LOGIN);

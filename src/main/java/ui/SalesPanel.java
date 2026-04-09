@@ -56,6 +56,8 @@ public class SalesPanel extends JPanel implements ThemeManager.ThemeListener {
     private JLabel customerSelectedLabel;
     private JLabel totalLabel;
 
+    private JTextField searchField;
+
     private DefaultTableModel productsModel;
     private DefaultTableModel cartModel;
     private final Map<Product, Integer> cart = new LinkedHashMap<>();
@@ -173,6 +175,32 @@ public class SalesPanel extends JPanel implements ThemeManager.ThemeListener {
 
         left.add(addToCartBtn);
         left.add(removeItemBtn);
+        searchField = new JTextField("Search products...") {
+            @Override
+            public void addNotify() {
+                super.addNotify();
+                setForeground(ThemeManager.textSecondary());
+                addFocusListener(new java.awt.event.FocusAdapter() {
+                    @Override
+                    public void focusGained(java.awt.event.FocusEvent e) {
+                        if (getText().equals("Search products...")) {
+                            setText("");
+                            setForeground(ThemeManager.textPrimary());
+                        }
+                    }
+                    @Override
+                    public void focusLost(java.awt.event.FocusEvent e) {
+                        if (getText().trim().isEmpty()) {
+                            setText("Search products...");
+                            setForeground(ThemeManager.textSecondary());
+                        }
+                    }
+                });
+            }
+        };
+        searchField.setPreferredSize(new Dimension(180, 42));
+        searchField.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        left.add(searchField);
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 0));
         right.setOpaque(false);
@@ -249,6 +277,12 @@ public class SalesPanel extends JPanel implements ThemeManager.ThemeListener {
         filterCombo.addActionListener(e -> loadCatalogue());
         sortCombo.addActionListener(e -> loadCatalogue());
 
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { loadCatalogue(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { loadCatalogue(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { loadCatalogue(); }
+        });
+
         accountHolderRadio.addActionListener(e -> {
             selectCustomerBtn.setEnabled(true);
             selectedCustomer = null;
@@ -302,7 +336,14 @@ public class SalesPanel extends JPanel implements ThemeManager.ThemeListener {
     private void loadCatalogue() {
         productsModel.setRowCount(0);
         List<Product> products = ProductDB.getAllProducts();
-
+        String keyword = searchField != null &&
+                !searchField.getText().equals("Search products...")
+                ? searchField.getText().trim().toLowerCase() : "";        if (!keyword.isEmpty()) {
+            products.removeIf(p ->
+                    !p.getDescription().toLowerCase().contains(keyword) &&
+                            !p.getItemId().toLowerCase().contains(keyword)
+            );
+        }
         String filter = (String) filterCombo.getSelectedItem();
         String sort = (String) sortCombo.getSelectedItem();
 
@@ -479,13 +520,27 @@ public class SalesPanel extends JPanel implements ThemeManager.ThemeListener {
             // "success" — fall through to record sale
         }
 
+
+
+        // Calculate discount from customer's plan
+        double discountAmount = 0.00;
+        if (accountSale && selectedCustomer != null && selectedCustomer.getDiscountPlanId() > 0) {
+            domain.DiscountPlan plan = database.DiscountPlanDB.getById(selectedCustomer.getDiscountPlanId());
+            if (plan != null) {
+                double subtotalForDiscount = cart.entrySet().stream()
+                        .mapToDouble(e -> e.getKey().getPrice() * e.getValue())
+                        .sum();
+                discountAmount = subtotalForDiscount * (plan.getDiscountPercent() / 100.0);
+            }
+        }
+
         int saleId = SaleDB.recordSale(
                 Session.getUserId(),
                 selectedCustomer,
                 saleType,
                 paymentMethod,
                 cart,
-                0.00
+                discountAmount
         );
 
         if (saleId == -1) {
@@ -501,7 +556,7 @@ public class SalesPanel extends JPanel implements ThemeManager.ThemeListener {
                     .mapToDouble(e -> e.getKey().getPrice() * e.getValue()
                             * (e.getKey().getVatRate() / 100.0))
                     .sum();
-            double amountDue = subtotal + vatAmount;
+            double amountDue = subtotal - discountAmount + vatAmount;
 
             String invoiceNumber = SaleDB.generateInvoice(saleId, selectedCustomer.getCustomerId(), amountDue);
 
@@ -520,9 +575,10 @@ public class SalesPanel extends JPanel implements ThemeManager.ThemeListener {
                     pdfItems.add(new PdfGenerator.InvoiceItem(
                             p.getDescription(), qty, p.getPrice(), lineTotal, p.getVatRate()));
                 }
+
                 PdfGenerator.generateRetailInvoice(
                         this, selectedCustomer, invoiceNumber,
-                        pdfItems, subtotal, vatAmount, amountDue,
+                        pdfItems, subtotal, discountAmount, vatAmount, amountDue,
                         Session.getCurrentUser().getFullName());
             }
         } else {

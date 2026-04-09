@@ -32,6 +32,8 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
     private JButton changeStatusBtn;
     private JButton recordPaymentBtn;
     private JButton refreshBtn;
+    private JButton editCustomerBtn;
+    private JButton deleteCustomerBtn;
 
     private JTextField searchField;
     private JComboBox<String> filterCombo;
@@ -63,6 +65,8 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
 
         topControls = new JPanel(new BorderLayout(20, 0));
         topControls.setOpaque(false);
+
+
 
         JPanel leftControls = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
         leftControls.setOpaque(false);
@@ -117,7 +121,11 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
         changeStatusBtn = createActionButton("Change Status", false);
         recordPaymentBtn = createActionButton("Record Payment", false);
         refreshBtn = createActionButton("Refresh", false);
+        editCustomerBtn   = createActionButton("Edit Customer",   false);
+        deleteCustomerBtn = createActionButton("Delete Customer", false);
 
+        bottomControls.add(editCustomerBtn);
+        bottomControls.add(deleteCustomerBtn);
         bottomControls.add(addCustomerBtn);
         bottomControls.add(changeStatusBtn);
         bottomControls.add(recordPaymentBtn);
@@ -168,6 +176,38 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
             }
             showRecordPaymentDialog(row);
         });
+
+        editCustomerBtn.addActionListener(e -> {
+            int row = table.getSelectedRow();
+            if (row == -1) {
+                JOptionPane.showMessageDialog(this, "Please select a customer.");
+                return;
+            }
+            showEditDialog(row);
+        });
+
+
+        deleteCustomerBtn.addActionListener(e -> {
+            if (!Session.isManagerOrAdmin()) {
+                JOptionPane.showMessageDialog(this, "Only Managers and Admins can delete customers.");
+                return;
+            }
+            int row = table.getSelectedRow();
+            if (row == -1) {
+                JOptionPane.showMessageDialog(this, "Please select a customer.");
+                return;
+            }
+            int customerId = (int) tableModel.getValueAt(row, 0);
+            String name = tableModel.getValueAt(row, 1).toString();
+            int confirm = JOptionPane.showConfirmDialog(this,
+                    "Delete customer: " + name + "?\nNote: customers with existing records will be deactivated instead.",
+                    "Confirm Delete", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                CustomerDB.deleteCustomer(customerId);
+                loadTable();
+            }
+        });
+
 
         addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
@@ -300,7 +340,26 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
             return;
         }
 
-        String[] options = {"ACTIVE", "SUSPENDED", "IN_DEFAULT"};
+        // Block direct IN_DEFAULT → ACTIVE via this dialog — must go through Record Payment
+        if ("IN_DEFAULT".equals(customer.getAccountStatus())) {
+            if (!Session.isManagerOrAdmin()) {
+                JOptionPane.showMessageDialog(this,
+                        "Only a Manager or Admin can change the status of an IN DEFAULT account.");
+                return;
+            }
+            JOptionPane.showMessageDialog(this,
+                    "This account is IN DEFAULT.\n" +
+                            "To restore it to Active, use 'Record Payment' to clear the full balance.");
+            return;
+        }
+
+        // For ACTIVE/SUSPENDED only — managers and above
+        if (!Session.isManagerOrAdmin()) {
+            JOptionPane.showMessageDialog(this, "Only Managers and Admins can change customer status.");
+            return;
+        }
+
+        String[] options = {"ACTIVE", "SUSPENDED"};
         String chosen = (String) JOptionPane.showInputDialog(
                 this,
                 "Change status for " + customer.getFullName(),
@@ -325,12 +384,39 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
             return;
         }
 
+        // Load unpaid invoices for this customer
+        java.util.List<java.util.Map<String, Object>> unpaidInvoices =
+                database.SaleDB.getUnpaidInvoices(customerId);
+
+        // Build invoice selector
+        String[] invoiceLabels;
+        int[] invoiceIds;
+
+        if (unpaidInvoices.isEmpty()) {
+            invoiceLabels = new String[]{"No specific invoice (general payment)"};
+            invoiceIds    = new int[]{0};
+        } else {
+            invoiceLabels = new String[unpaidInvoices.size() + 1];
+            invoiceIds    = new int[unpaidInvoices.size() + 1];
+            invoiceLabels[0] = "General payment (no invoice)";
+            invoiceIds[0]    = 0;
+            for (int i = 0; i < unpaidInvoices.size(); i++) {
+                java.util.Map<String, Object> inv = unpaidInvoices.get(i);
+                invoiceLabels[i + 1] = inv.get("invoice_number") + " — £"
+                        + String.format("%.2f", (Double) inv.get("amount_due"))
+                        + " (" + inv.get("status") + ")";
+                invoiceIds[i + 1] = (int) inv.get("invoice_id");
+            }
+        }
+
+        JComboBox<String> invoiceCombo = new JComboBox<>(invoiceLabels);
         JTextField amountField = new JTextField();
         JComboBox<String> methodCombo = new JComboBox<>(new String[]{"CARD", "BANK_TRANSFER", "CASH"});
 
         Object[] fields = {
                 "Customer: " + customer.getFullName(),
                 "Current Balance: £" + String.format("%.2f", customer.getCurrentBalance()),
+                "Select Invoice:", invoiceCombo,
                 "Payment Amount £:", amountField,
                 "Payment Method:", methodCombo
         };
@@ -342,16 +428,41 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
             double amount = Double.parseDouble(amountField.getText().trim());
             if (amount <= 0) throw new NumberFormatException();
 
+            int selectedInvoiceId = invoiceIds[invoiceCombo.getSelectedIndex()];
             double newBalance = Math.max(0, customer.getCurrentBalance() - amount);
             CustomerDB.updateBalance(customerId, newBalance);
 
+            // Mark invoice as PAID if fully paid
+            if (selectedInvoiceId > 0) {
+                java.util.Map<String, Object> selectedInv =
+                        unpaidInvoices.get(invoiceCombo.getSelectedIndex() - 1);
+                double invoiceAmount = (Double) selectedInv.get("amount_due");
+                if (amount >= invoiceAmount) {
+                    database.SaleDB.updateInvoiceStatus(selectedInvoiceId, "PAID");
+                } else {
+                    database.SaleDB.updateInvoiceStatus(selectedInvoiceId, "PARTIALLY_PAID");
+                }
+            }
+
+            // Auto-restore status after payment
             if ("SUSPENDED".equals(customer.getAccountStatus()) && newBalance == 0) {
                 CustomerDB.updateStatus(customerId, "ACTIVE");
+            } else if ("IN_DEFAULT".equals(customer.getAccountStatus())) {
+                if (Session.isManagerOrAdmin() && newBalance == 0) {
+                    CustomerDB.updateStatus(customerId, "ACTIVE");
+                } else if (!Session.isManagerOrAdmin()) {
+                    JOptionPane.showMessageDialog(this,
+                            "Payment recorded. Only a Manager or Admin can restore an IN DEFAULT account.");
+                } else {
+                    JOptionPane.showMessageDialog(this,
+                            "Payment recorded. Balance must be fully cleared to restore account (£"
+                                    + String.format("%.2f", newBalance) + " remaining).");
+                }
             }
 
             CustomerDB.recordAccountPayment(
                     customerId,
-                    0,
+                    selectedInvoiceId,
                     app.Session.getUserId(),
                     (String) methodCombo.getSelectedItem(),
                     amount,
@@ -359,12 +470,66 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
             );
 
             loadTable();
-            JOptionPane.showMessageDialog(
-                    this,
-                    "Payment recorded.\nNew balance: £" + String.format("%.2f", newBalance)
-            );
+            JOptionPane.showMessageDialog(this,
+                    "Payment recorded.\nNew balance: £" + String.format("%.2f", newBalance));
+
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(this, "Please enter a valid payment amount.");
+        }
+    }
+
+    private void showEditDialog(int row) {
+        int customerId = (int) tableModel.getValueAt(row, 0);
+        Customer customer = CustomerDB.getById(customerId);
+        if (customer == null) return;
+
+        JTextField nameField  = new JTextField(customer.getFullName());
+        JTextField emailField = new JTextField(customer.getEmail() != null ? customer.getEmail() : "");
+        JTextField phoneField = new JTextField(customer.getPhone() != null ? customer.getPhone() : "");
+        JTextField limitField = new JTextField(String.format("%.2f", customer.getCreditLimit()));
+
+        List<DiscountPlan> plans = DiscountPlanDB.getAllPlans();
+        JComboBox<DiscountPlan> planCombo = new JComboBox<>(plans.toArray(new DiscountPlan[0]));
+        planCombo.insertItemAt(null, 0);
+        planCombo.setSelectedIndex(0);
+        for (int i = 0; i < plans.size(); i++) {
+            if (plans.get(i).getDiscountPlanId() == customer.getDiscountPlanId()) {
+                planCombo.setSelectedIndex(i + 1);
+                break;
+            }
+        }
+
+        Object[] fields = {
+                "Full Name:",      nameField,
+                "Email:",          emailField,
+                "Phone:",          phoneField,
+                "Credit Limit £:", limitField,
+                "Discount Plan:",  planCombo
+        };
+
+        int result = JOptionPane.showConfirmDialog(this, fields,
+                "Edit Customer", JOptionPane.OK_CANCEL_OPTION);
+        if (result != JOptionPane.OK_OPTION) return;
+
+        try {
+            DiscountPlan selected = (DiscountPlan) planCombo.getSelectedItem();
+            int planId = selected != null ? selected.getDiscountPlanId() : 0;
+            Customer updated = new Customer(
+                    customerId,
+                    customer.getAccountNumber(),
+                    nameField.getText().trim(),
+                    emailField.getText().trim(),
+                    phoneField.getText().trim(),
+                    customer.getAddress() != null ? customer.getAddress() : "",
+                    Double.parseDouble(limitField.getText().trim()),
+                    customer.getCurrentBalance(),
+                    customer.getAccountStatus(),
+                    planId
+            );
+            CustomerDB.updateCustomer(updated);
+            loadTable();
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "Please enter a valid credit limit.");
         }
     }
 
@@ -512,6 +677,9 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
         if (topControls != null) topControls.setBackground(ThemeManager.appBackground());
         if (bottomControls != null) bottomControls.setBackground(ThemeManager.appBackground());
         if (tableCard != null) tableCard.setBackground(ThemeManager.panelBackground());
+
+        if (editCustomerBtn   != null) restyleActionButton(editCustomerBtn,   false);
+        if (deleteCustomerBtn != null) restyleActionButton(deleteCustomerBtn, false);
 
         if (table != null) applyTableTheme(table);
         if (scrollPane != null) styleScrollPane(scrollPane);

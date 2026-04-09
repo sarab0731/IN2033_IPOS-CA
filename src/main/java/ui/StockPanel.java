@@ -5,6 +5,7 @@ import domain.Product;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.plaf.basic.BasicHTML;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
@@ -42,6 +43,8 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
 
     private final List<Product> allProducts = new ArrayList<>();
     private final List<Product> visibleProducts = new ArrayList<>();
+
+    JTextField searchField ;
 
     public StockPanel(ScreenRouter router) {
         this.router = router;
@@ -103,9 +106,36 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
 
         orderStockBtn = createPillButton("+  Order Stock", true);
 
-        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         left.setOpaque(false);
         left.add(orderStockBtn);
+
+        searchField = new JTextField("Search products...") {
+            @Override
+            public void addNotify() {
+                super.addNotify();
+                setForeground(ThemeManager.textSecondary());
+                addFocusListener(new java.awt.event.FocusAdapter() {
+                    @Override
+                    public void focusGained(java.awt.event.FocusEvent e) {
+                        if (getText().equals("Search products...")) {
+                            setText("");
+                            setForeground(ThemeManager.textPrimary());
+                        }
+                    }
+                    @Override
+                    public void focusLost(java.awt.event.FocusEvent e) {
+                        if (getText().trim().isEmpty()) {
+                            setText("Search products...");
+                            setForeground(ThemeManager.textSecondary());
+                        }
+                    }
+                });
+            }
+        };
+        searchField.setPreferredSize(new Dimension(200, 36));
+        searchField.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        left.add(searchField);
 
         filterCombo = new JComboBox<>(new String[]{
                 "All Stocks", "Good", "Low", "Restock"
@@ -234,8 +264,15 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         });
 
         filterCombo.addActionListener(e -> refreshTableView());
+
+
         sortCombo.addActionListener(e -> refreshTableView());
 
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { refreshTableView(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { refreshTableView(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { refreshTableView(); }
+        });
         addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
             public void componentShown(java.awt.event.ComponentEvent e) {
@@ -275,8 +312,17 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         List<Product> filtered = new ArrayList<>();
         for (Product product : allProducts) {
             String status = getStatusText(product);
-            boolean include = "All Stocks".equals(selectedFilter)
-                    || status.equalsIgnoreCase(selectedFilter);
+
+            String keyword = searchField != null &&
+                    !searchField.getText().equals("Search products...")
+                    ? searchField.getText().trim().toLowerCase() : "";
+            
+            boolean matchesSearch = keyword.isEmpty()
+                    || product.getDescription().toLowerCase().contains(keyword)
+                    || product.getItemId().toLowerCase().contains(keyword);
+
+            boolean include = matchesSearch && ("All Stocks".equals(selectedFilter)
+                    || status.equalsIgnoreCase(selectedFilter));
 
             if (include) {
                 filtered.add(product);

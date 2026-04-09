@@ -221,6 +221,9 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
 
         orderHistoryTab.addActionListener(e -> showOrderHistoryDialog());
 
+        placeNewOrderTab.addActionListener(e ->
+                JOptionPane.showMessageDialog(this, "You are already on Place New Order."));
+
         addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
             public void componentShown(java.awt.event.ComponentEvent e) {
@@ -332,6 +335,16 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         merchantId = merchantId.trim();
         merchantIdValue.setText(merchantId);
 
+        double outstanding = RestockOrderDB.getOutstandingValue();
+        double limit = 10000.00; // configurable threshold
+        if (outstanding > limit) {
+            JOptionPane.showMessageDialog(this,
+                    "Cannot place order. Outstanding balance (£" + String.format("%.2f", outstanding) +
+                            ") exceeds the allowed limit. Please settle your account first.",
+                    "Account Restricted", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
         String orderNumber = RestockOrderDB.placeOrder(merchantId, cart);
 
         if (orderNumber != null) {
@@ -380,6 +393,8 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         JButton viewItemsBtn       = createRestockStyleButton("View Items", false);
         JButton printOrderFormBtn  = createRestockStyleButton("Print Order Form", false);
         JButton updateStatusBtn    = createRestockStyleButton("Update Status", true);
+        JButton viewInvoiceBtn = createRestockStyleButton("View Invoice", false);
+
 
         JPanel panel = new JPanel(new BorderLayout(12, 12));
         panel.setBorder(new EmptyBorder(12, 12, 12, 12));
@@ -393,6 +408,8 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         buttons.add(printOrderFormBtn);
         buttons.add(updateStatusBtn);
         panel.add(buttons, BorderLayout.SOUTH);
+        buttons.add(viewInvoiceBtn);
+
 
         JDialog dialog = new JDialog(
                 SwingUtilities.getWindowAncestor(this),
@@ -424,6 +441,18 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
             PdfGenerator.generateOrderForm(dialog, order, items);
         });
 
+        viewInvoiceBtn.addActionListener(e -> {
+            int row = historyTable.getSelectedRow();
+            if (row == -1) { JOptionPane.showMessageDialog(dialog, "Please select an order."); return; }
+            int modelRow = historyTable.convertRowIndexToModel(row);
+            String orderNum = String.valueOf(historyModel.getValueAt(modelRow, 1));
+            String merchantId = String.valueOf(historyModel.getValueAt(modelRow, 2));
+            String status = String.valueOf(historyModel.getValueAt(modelRow, 3));
+            String total = String.valueOf(historyModel.getValueAt(modelRow, 4));
+            String date = String.valueOf(historyModel.getValueAt(modelRow, 5));
+            showOrderInvoiceDialog(dialog, orderNum, merchantId, status, total, date);
+        });
+
         updateStatusBtn.addActionListener(e -> {
             int row = historyTable.getSelectedRow();
             if (row == -1) {
@@ -450,6 +479,20 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
 
             if (confirm == JOptionPane.YES_OPTION) {
                 RestockOrderDB.updateStatus(orderId, currentStatus, nextStatus);
+
+                if ("DELIVERED".equals(nextStatus)) {
+                    java.util.List<domain.RestockOrderItem> deliveredItems =
+                            RestockOrderDB.getOrderItems(orderId);
+                    for (domain.RestockOrderItem item : deliveredItems) {
+                        domain.Product p = ProductDB.getByItemId(item.getItemId());
+                        if (p != null) {
+                            ProductDB.updateStock(p.getProductId(), item.getQuantity());
+                        }
+                    }
+                    JOptionPane.showMessageDialog(dialog,
+                            "Delivery recorded. Stock updated for " +
+                                    deliveredItems.size() + " product(s).");
+                }
                 loadOrderHistory(historyModel);
                 loadCatalogue();
             }
@@ -540,6 +583,11 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         card.add(Box.createHorizontalStrut(18));
         card.add(outLabel);
         card.add(outstandingValue);
+
+        JButton balanceBtn = createRestockStyleButton("Check Balance", false);
+        card.add(Box.createHorizontalStrut(18));
+        card.add(balanceBtn);
+        balanceBtn.addActionListener(e -> showAccountBalanceDialog());
 
         refreshMerchantStatus();
         return card;
@@ -744,5 +792,48 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
             button.setForeground(ThemeManager.textPrimary());
             button.putClientProperty("outlineColor", ThemeManager.borderColor());
         }
+    }
+
+    private void showAccountBalanceDialog() {
+        int activeOrders    = RestockOrderDB.getActiveOrderCount();
+        double outstanding  = RestockOrderDB.getOutstandingValue();
+
+        String message = String.format(
+                "Merchant Account Summary\n\n" +
+                        "Active Orders:       %d\n" +
+                        "Outstanding Balance: £%.2f\n\n" +
+                        "Note: Balance represents the total value of\n" +
+                        "accepted/processed/dispatched orders not yet delivered.",
+                activeOrders, outstanding
+        );
+
+        JOptionPane.showMessageDialog(this, message,
+                "Account Balance", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void showOrderInvoiceDialog(java.awt.Window parent, String orderNumber,
+                                        String merchantId, String status, String total, String date) {
+
+        String invoice = String.format(
+                "ORDER INVOICE\n" +
+                        "═══════════════════════════════\n" +
+                        "Order Number : %s\n" +
+                        "Merchant ID  : %s\n" +
+                        "Date         : %s\n" +
+                        "Status       : %s\n" +
+                        "───────────────────────────────\n" +
+                        "Total Value  : £%s\n" +
+                        "═══════════════════════════════\n\n" +
+                        "Payment is due by end of calendar month.",
+                orderNumber, merchantId, date, status, total
+        );
+
+        JTextArea area = new JTextArea(invoice);
+        area.setEditable(false);
+        area.setFont(new Font("Monospaced", Font.PLAIN, 13));
+        area.setMargin(new Insets(12, 12, 12, 12));
+
+        JOptionPane.showMessageDialog(parent, new JScrollPane(area),
+                "Invoice — " + orderNumber, JOptionPane.PLAIN_MESSAGE);
     }
 }

@@ -13,6 +13,7 @@ public class SaleDB {
 
     /**
      * Records a full sale. items is a map of Product -> quantity.
+     * Discount is distributed proportionally across line items.
      * Returns the generated sale_id or -1 on failure.
      */
     public static int recordSale(int processedByUserId, Customer customer,
@@ -80,15 +81,20 @@ public class SaleDB {
                 Product p = entry.getKey();
                 int qty = entry.getValue();
                 double lineSubtotal = p.getPrice() * qty;
-                double lineVat = lineSubtotal * (p.getVatRate() / 100);
-                double lineTotal = lineSubtotal + lineVat;
+
+                // Distribute discount proportionally per line item
+                double lineDiscountFraction = (subtotal > 0) ? (lineSubtotal / subtotal) : 0;
+                double lineDiscount = discountAmount * lineDiscountFraction;
+
+                double lineVat = (lineSubtotal - lineDiscount) * (p.getVatRate() / 100);
+                double lineTotal = lineSubtotal - lineDiscount + lineVat;
 
                 itemStmt.setInt(1, saleId);
                 itemStmt.setInt(2, p.getProductId());
                 itemStmt.setInt(3, qty);
                 itemStmt.setDouble(4, p.getPrice());
                 itemStmt.setDouble(5, p.getVatRate());
-                itemStmt.setDouble(6, 0.00);
+                itemStmt.setDouble(6, lineDiscount);  // now properly set
                 itemStmt.setDouble(7, lineTotal);
                 itemStmt.executeUpdate();
 
@@ -156,9 +162,6 @@ public class SaleDB {
         return num;
     }
 
-    /**
-     * Returns total turnover (sum of total_amount) for a date range.
-     */
     public static double getTurnover(String fromDate, String toDate) {
         String sql = """
             SELECT COALESCE(SUM(total_amount), 0) AS turnover
@@ -172,9 +175,7 @@ public class SaleDB {
             stmt.setString(1, fromDate);
             stmt.setString(2, toDate);
             ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                return rs.getDouble("turnover");
-            }
+            if (rs.next()) return rs.getDouble("turnover");
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -182,10 +183,6 @@ public class SaleDB {
         return 0;
     }
 
-    /**
-     * Returns per-product sales breakdown for a date range.
-     * Each map entry: item_id, description, qty_sold, revenue.
-     */
     public static List<Map<String, Object>> getSalesByProduct(String fromDate, String toDate) {
         List<Map<String, Object>> results = new ArrayList<>();
         String sql = """
@@ -222,10 +219,6 @@ public class SaleDB {
         return results;
     }
 
-    /**
-     * Generates a monthly statement for a customer covering a date range.
-     * Returns the statement number or null on failure.
-     */
     public static String generateMonthlyStatement(int customerId, String periodStart,
                                                   String periodEnd, double totalDue) {
         String num = "STM-" + System.currentTimeMillis();
@@ -252,9 +245,6 @@ public class SaleDB {
         }
     }
 
-    /**
-     * Returns all unpaid/partially paid invoices for a customer.
-     */
     public static List<Map<String, Object>> getUnpaidInvoices(int customerId) {
         List<Map<String, Object>> results = new ArrayList<>();
         String sql = """
@@ -285,9 +275,6 @@ public class SaleDB {
         return results;
     }
 
-    /**
-     * Updates an invoice status (UNPAID, PARTIALLY_PAID, PAID, OVERDUE).
-     */
     public static boolean updateInvoiceStatus(int invoiceId, String newStatus) {
         String sql = "UPDATE invoices SET status = ? WHERE invoice_id = ?";
 
@@ -312,9 +299,7 @@ public class SaleDB {
              PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
 
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
+            if (rs.next()) return rs.getInt(1);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -329,9 +314,7 @@ public class SaleDB {
              PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
 
-            if (rs.next()) {
-                return rs.getDouble(1);
-            }
+            if (rs.next()) return rs.getDouble(1);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -351,9 +334,7 @@ public class SaleDB {
 
             stmt.setString(1, "-" + days + " day");
             ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                return rs.getDouble(1);
-            }
+            if (rs.next()) return rs.getDouble(1);
 
         } catch (Exception e) {
             e.printStackTrace();

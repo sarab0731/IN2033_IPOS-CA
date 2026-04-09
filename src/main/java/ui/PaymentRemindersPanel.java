@@ -202,13 +202,26 @@ public class PaymentRemindersPanel extends JPanel implements ThemeManager.ThemeL
              ResultSet rs = fetch.executeQuery()) {
 
             while (rs.next()) {
+                int reminderType = "FIRST".equals(rs.getString("reminder_type")) ? 1 : 2;
+                String template  = TemplatesPanel.getReminderTemplate(reminderType);
+
+                String content = template
+                        .replace("{customer_name}",  rs.getString("full_name"))
+                        .replace("{invoice_number}", rs.getString("invoice_number"))
+                        .replace("{account_number}", rs.getString("account_number"))
+                        .replace("{amount_due}",     String.format("%.2f", rs.getDouble("amount_due")))
+                        .replace("{signed_by}",      "Pharmacy Manager");
+
+                JTextArea area = new JTextArea(content);
+                area.setEditable(false);
+                area.setFont(new Font("Monospaced", Font.PLAIN, 12));
+                area.setMargin(new java.awt.Insets(10, 10, 10, 10));
+                area.setPreferredSize(new java.awt.Dimension(480, 280));
+
                 JOptionPane.showMessageDialog(
                         this,
-                        rs.getString("reminder_type") + " reminder prepared for " + rs.getString("full_name") +
-                                "\nAccount: " + rs.getString("account_number") +
-                                "\nInvoice: " + rs.getString("invoice_number") +
-                                "\nAmount due: £" + String.format("%.2f", rs.getDouble("amount_due")),
-                        "Reminder Generated",
+                        new javax.swing.JScrollPane(area),
+                        rs.getString("reminder_type") + " Reminder — " + rs.getString("full_name"),
                         JOptionPane.INFORMATION_MESSAGE
                 );
 

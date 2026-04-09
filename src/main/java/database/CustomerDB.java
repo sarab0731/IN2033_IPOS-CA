@@ -10,7 +10,7 @@ public class CustomerDB {
 
     public static List<Customer> getAllActiveCustomers() {
         List<Customer> list = new ArrayList<>();
-        String sql = "SELECT * FROM customer_accounts ORDER BY full_name";
+        String sql = "SELECT * FROM customer_accounts WHERE account_status != 'DELETED' ORDER BY full_name";
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql);
@@ -219,5 +219,46 @@ public class CustomerDB {
                 rs.getString("account_status"),
                 rs.getInt("discount_plan_id")
         );
+    }
+
+    public static boolean deleteCustomer(int customerId) {
+        // Check for linked records before attempting delete
+        String checkSql = """
+        SELECT 
+            (SELECT COUNT(*) FROM sales WHERE customer_id = ?) +
+            (SELECT COUNT(*) FROM invoices WHERE customer_id = ?) +
+            (SELECT COUNT(*) FROM account_payments WHERE customer_id = ?) AS total
+        """;
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement check = conn.prepareStatement(checkSql)) {
+
+            check.setInt(1, customerId);
+            check.setInt(2, customerId);
+            check.setInt(3, customerId);
+            ResultSet rs = check.executeQuery();
+
+            if (rs.next() && rs.getInt("total") > 0) {
+                // Has linked records — soft delete instead
+                String softSql = "UPDATE customer_accounts SET account_status = 'DELETED' WHERE customer_id = ?";
+                try (PreparedStatement soft = conn.prepareStatement(softSql)) {
+                    soft.setInt(1, customerId);
+                    soft.executeUpdate();
+                    return true;
+                }
+            }
+
+            // No linked records — safe to hard delete
+            String deleteSql = "DELETE FROM customer_accounts WHERE customer_id = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(deleteSql)) {
+                stmt.setInt(1, customerId);
+                stmt.executeUpdate();
+                return true;
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 }

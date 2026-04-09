@@ -71,14 +71,18 @@ public class ReportsPanel extends JPanel implements ThemeManager.ThemeListener {
         JButton turnoverTab = new JButton("Turnover");
         JButton stockAvailabilityTab = new JButton("Stock Availability");
         JButton customerDebtTab = new JButton("Customer Debt");
+        JButton exportPdfBtn = new JButton("Export PDF");
 
         turnoverTab.setFocusable(false);
         stockAvailabilityTab.setFocusable(false);
         customerDebtTab.setFocusable(false);
+        exportPdfBtn.setFont(new Font("SansSerif", Font.BOLD, 13));
+
 
         turnoverTab.addActionListener(e -> { activeReport = "TURNOVER"; generateReport(); });
         stockAvailabilityTab.addActionListener(e -> { activeReport = "STOCK"; generateReport(); });
         customerDebtTab.addActionListener(e -> { activeReport = "DEBT"; generateReport(); });
+        exportPdfBtn.addActionListener(e -> exportReportToPdf());
 
         topTabBar.add(turnoverTab);
         topTabBar.add(stockAvailabilityTab);
@@ -99,6 +103,7 @@ public class ReportsPanel extends JPanel implements ThemeManager.ThemeListener {
         controlsPanel.add(toLabel);
         controlsPanel.add(toDateField);
         controlsPanel.add(generateBtn);
+        controlsPanel.add(exportPdfBtn);
 
         tableCard = AppShell.createCard();
         tableCard.setLayout(new BorderLayout());
@@ -145,6 +150,62 @@ public class ReportsPanel extends JPanel implements ThemeManager.ThemeListener {
         }
     }
 
+    private void exportReportToPdf() {
+        if (tableModel.getRowCount() == 0) {
+            JOptionPane.showMessageDialog(this, "No data to export.");
+            return;
+        }
+
+        java.io.File dest = PdfGenerator.chooseSaveFile(this, "report-" + activeReport.toLowerCase() + ".pdf");
+        if (dest == null) return;
+
+        try {
+            com.itextpdf.kernel.pdf.PdfDocument pdf =
+                    new com.itextpdf.kernel.pdf.PdfDocument(new com.itextpdf.kernel.pdf.PdfWriter(dest));
+            com.itextpdf.layout.Document doc =
+                    new com.itextpdf.layout.Document(pdf, com.itextpdf.kernel.geom.PageSize.A4);
+            doc.setMargins(40, 40, 40, 40);
+
+            com.itextpdf.kernel.font.PdfFont bold =
+                    com.itextpdf.kernel.font.PdfFontFactory.createFont(
+                            com.itextpdf.io.font.constants.StandardFonts.HELVETICA_BOLD);
+            com.itextpdf.kernel.font.PdfFont regular =
+                    com.itextpdf.kernel.font.PdfFontFactory.createFont(
+                            com.itextpdf.io.font.constants.StandardFonts.HELVETICA);
+
+            doc.add(PdfGenerator.para("IPOS-CA Report — " + activeReport, bold, 14));
+            doc.add(PdfGenerator.para("Generated: " + java.time.LocalDate.now(), regular, 10));
+            doc.add(PdfGenerator.spacer(12));
+
+            // Build column widths
+            int cols = tableModel.getColumnCount();
+            float[] widths = new float[cols];
+            for (int i = 0; i < cols; i++) widths[i] = 500f / cols;
+
+            com.itextpdf.layout.element.Table table =
+                    new com.itextpdf.layout.element.Table(widths);
+            table.setWidth(com.itextpdf.layout.properties.UnitValue.createPercentValue(100));
+
+            for (int i = 0; i < cols; i++) {
+                PdfGenerator.addHeaderCell(table, tableModel.getColumnName(i), bold);
+            }
+
+            for (int r = 0; r < tableModel.getRowCount(); r++) {
+                for (int c = 0; c < cols; c++) {
+                    Object val = tableModel.getValueAt(r, c);
+                    table.addCell(PdfGenerator.dataCell(val != null ? val.toString() : "", regular));
+                }
+            }
+
+            doc.add(table);
+            doc.close();
+            JOptionPane.showMessageDialog(this, "Report saved:\n" + dest.getAbsolutePath());
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Failed to export: " + ex.getMessage());
+        }
+    }
     private void generateTurnoverReport(String from, String to) {
         tableModel.setColumnIdentifiers(new String[]{"Item ID", "Description", "Qty Sold", "Revenue £"});
         tableModel.setRowCount(0);

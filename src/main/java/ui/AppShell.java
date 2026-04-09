@@ -21,7 +21,6 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
 
     private JLabel welcomeLabel;
     private JLabel roleLabel;
-    private JTextField searchField;
     private JLabel userNameLabel;
     private JLabel logoLabel;
 
@@ -54,12 +53,13 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         ThemeManager.register(this);
         applyTheme();
 
-        addComponentListener(new java.awt.event.ComponentAdapter() {
-            @Override
-            public void componentShown(java.awt.event.ComponentEvent e) {
-                refreshUserInfo();
-                updateNavVisibility();
-                highlightActiveButton();
+        addHierarchyListener(e -> {
+            if ((e.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0) {
+                if (isShowing()) {
+                    refreshUserInfo();
+                    updateNavVisibility();
+                    highlightActiveButton();
+                }
             }
         });
     }
@@ -89,6 +89,11 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         addNavButton(top, "Online Orders", MainFrame.SCREEN_PU_ORDERS);
         addNavButton(top, "Reports", MainFrame.SCREEN_REPORTS);
         addNavButton(top, "Reminders", MainFrame.SCREEN_REMINDERS);
+        addNavButton(top, "Users", MainFrame.SCREEN_USERS);
+        addNavButton(top, "Discount Plans", MainFrame.SCREEN_DISCOUNT_PLANS);
+        addNavButton(top, "Templates",      MainFrame.SCREEN_TEMPLATES);
+        addNavButton(top, "Discount Plans", MainFrame.SCREEN_DISCOUNT_PLANS);
+        addNavButton(top, "Templates",      MainFrame.SCREEN_TEMPLATES);
 
         panel.add(top, BorderLayout.NORTH);
 
@@ -148,12 +153,7 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 0));
         right.setOpaque(false);
 
-        searchField = new JTextField("Search", 12);
-        searchField.setPreferredSize(new Dimension(150, 36));
-        searchField.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(ThemeManager.borderColor()),
-                new EmptyBorder(6, 12, 6, 12)
-        ));
+
 
         JLabel bell = new JLabel("🔔");
         bell.setFont(new Font("SansSerif", Font.PLAIN, 16));
@@ -164,7 +164,6 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         userNameLabel = new JLabel("Username");
         userNameLabel.setFont(new Font("SansSerif", Font.PLAIN, 13));
 
-        right.add(searchField);
         right.add(bell);
         right.add(avatar);
         right.add(userNameLabel);
@@ -299,9 +298,16 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         JButton customersBtn = navButtons.get(MainFrame.SCREEN_CUSTOMERS);
         JButton ordersBtn = navButtons.get(MainFrame.SCREEN_ORDERS);
         JButton remindersBtn = navButtons.get(MainFrame.SCREEN_REMINDERS);
+        JButton usersBtn = navButtons.get(MainFrame.SCREEN_USERS);
+        JButton discountBtn  = navButtons.get(MainFrame.SCREEN_DISCOUNT_PLANS);
+        JButton templatesBtn = navButtons.get(MainFrame.SCREEN_TEMPLATES);
+
 
         if (reportsBtn != null) {
             reportsBtn.setVisible(user.isManager() || user.isAdmin());
+        }
+        if (usersBtn != null) {
+            usersBtn.setVisible(user.isAdmin());
         }
         if (customersBtn != null) {
             customersBtn.setVisible(!user.isPharmacist());
@@ -311,6 +317,12 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         }
         if (remindersBtn != null) {
             remindersBtn.setVisible(user.isManager() || user.isAdmin());
+        }
+        if (discountBtn  != null) {
+            discountBtn.setVisible(user.isManager() || user.isAdmin());
+        }
+        if (templatesBtn != null) {
+            templatesBtn.setVisible(user.isManager() || user.isAdmin());
         }
     }
 
@@ -368,15 +380,7 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
             roleLabel.setForeground(ThemeManager.textSecondary());
         }
 
-        if (searchField != null) {
-            searchField.setBackground(ThemeManager.searchBackground());
-            searchField.setForeground(ThemeManager.textPrimary());
-            searchField.setCaretColor(ThemeManager.textPrimary());
-            searchField.setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createLineBorder(ThemeManager.borderColor()),
-                    new EmptyBorder(6, 12, 6, 12)
-            ));
-        }
+
 
         if (userNameLabel != null) {
             userNameLabel.setForeground(ThemeManager.textPrimary());
