@@ -15,6 +15,13 @@ public class DatabaseManager {
     private static final String PASSWORD;
 
     static {
+        // Force the MySQL driver to register itself (required when running outside a fat JAR)
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+        } catch (ClassNotFoundException e) {
+            System.err.println("[DatabaseManager] MySQL driver not found on classpath: " + e.getMessage());
+        }
+
         Properties props = new Properties();
 
         // 1. Try db.properties next to the JAR / in the working directory
