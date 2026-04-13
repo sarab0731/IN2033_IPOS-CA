@@ -10,15 +10,29 @@ public class CustomerDB {
 
     public static List<Customer> getAllActiveCustomers() {
         List<Customer> list = new ArrayList<>();
-        String sql = "SELECT * FROM customer_accounts WHERE is_active = 1 ORDER BY full_name";
-        try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
+        String activeOnlySql = "SELECT * FROM customer_accounts WHERE is_active = 1 ORDER BY full_name";
+        String fallbackSql = "SELECT * FROM customer_accounts ORDER BY full_name";
 
-            while (rs.next()) {
-                list.add(mapRow(rs));
+        try (Connection conn = DatabaseManager.getConnection()) {
+            try (PreparedStatement stmt = conn.prepareStatement(activeOnlySql);
+                 ResultSet rs = stmt.executeQuery()) {
+
+                while (rs.next()) {
+                    list.add(mapRow(rs));
+                }
+            } catch (SQLException ex) {
+                // Backward compatibility: some existing schemas may not have is_active.
+                if ("42S22".equals(ex.getSQLState())) {
+                    try (PreparedStatement stmt = conn.prepareStatement(fallbackSql);
+                         ResultSet rs = stmt.executeQuery()) {
+                        while (rs.next()) {
+                            list.add(mapRow(rs));
+                        }
+                    }
+                } else {
+                    throw ex;
+                }
             }
-
         } catch (Exception e) {
             e.printStackTrace();
         }

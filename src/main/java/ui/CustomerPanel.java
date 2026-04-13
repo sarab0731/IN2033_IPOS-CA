@@ -323,7 +323,11 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
             );
 
             if (CustomerDB.addCustomer(customer)) {
+                searchField.setText("");
+                filterCombo.setSelectedItem("All Customers");
                 loadTable();
+                focusCustomerRowByAccountNumber(customer.getAccountNumber());
+                JOptionPane.showMessageDialog(this, "Customer added successfully.");
             } else {
                 JOptionPane.showMessageDialog(this, "Failed to add customer. Account number may already exist.");
             }
@@ -592,6 +596,19 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
         sp.setBackground(ThemeManager.tableBackground());
         sp.getViewport().setBackground(ThemeManager.tableBackground());
         sp.getViewport().setBorder(null);
+    }
+
+    private void focusCustomerRowByAccountNumber(String accountNumber) {
+        String marker = "(" + accountNumber + ")";
+        for (int i = 0; i < tableModel.getRowCount(); i++) {
+            Object nameCell = tableModel.getValueAt(i, 1);
+            if (nameCell != null && nameCell.toString().endsWith(marker)) {
+                table.setRowSelectionInterval(i, i);
+                Rectangle rect = table.getCellRect(i, 0, true);
+                table.scrollRectToVisible(rect);
+                return;
+            }
+        }
     }
 
     private void applyTableTheme(JTable table) {
