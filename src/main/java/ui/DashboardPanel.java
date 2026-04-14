@@ -135,10 +135,10 @@ public class DashboardPanel extends JPanel implements ThemeManager.ThemeListener
         JPanel bottomSection = new JPanel(new GridLayout(1, 2, 20, 0));
         bottomSection.setOpaque(false);
 
-        orderStatusCard = AppShell.createCard();
+        orderStatusCard = createInteractiveCard(MainFrame.SCREEN_ORDERS);
         orderStatusCard.setLayout(new BorderLayout(12, 12));
 
-        staffAccountsCard = AppShell.createCard();
+        staffAccountsCard = createInteractiveCard(MainFrame.SCREEN_USERS);
         staffAccountsCard.setLayout(new BorderLayout(12, 12));
 
         buildOrderStatusCard();
