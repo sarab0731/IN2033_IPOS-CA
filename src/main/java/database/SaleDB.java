@@ -322,6 +322,25 @@ public class SaleDB {
         return 0;
     }
 
+    public static double getSalesValueToday() {
+        String sql = """
+            SELECT COALESCE(SUM(total_amount), 0)
+            FROM sales
+            WHERE DATE(sale_datetime) = CURRENT_DATE
+            """;
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            if (rs.next()) return rs.getDouble(1);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
     public static double getSalesValueLastDays(int days) {
         String sql = """
             SELECT COALESCE(SUM(total_amount), 0)
