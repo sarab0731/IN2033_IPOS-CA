@@ -258,6 +258,38 @@ public class RestockOrderDB {
     }
 
     /**
+     * Stores the SA-assigned order ID against the local restock order.
+     * Called after SASync.placeOrderViaSA() returns a non-null order ID.
+     */
+    public static void updateSAOrderId(String orderNumber, String saOrderId) {
+        String sql = "UPDATE restock_orders SET sa_order_id = ? WHERE order_number = ?";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, saOrderId);
+            stmt.setString(2, orderNumber);
+            stmt.executeUpdate();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Returns the SA order ID stored against a local restock order, or null if not set.
+     */
+    public static String getSAOrderId(int restockOrderId) {
+        String sql = "SELECT sa_order_id FROM restock_orders WHERE restock_order_id = ?";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, restockOrderId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return rs.getString("sa_order_id");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
      * Returns orders filtered by status.
      */
     public static List<RestockOrder> getOrdersByStatus(String status) {

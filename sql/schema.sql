@@ -288,3 +288,40 @@ CREATE TABLE IF NOT EXISTS transaction_history (
     ON DELETE SET NULL ON UPDATE CASCADE
     );
 
+-- ---------------------------------------------------------
+-- 16. SA CATALOGUE CACHE
+-- Local mirror of InfoPharma SA's active product catalogue,
+-- populated by SASync.syncCatalogue() on startup.
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS sa_catalogue_cache (
+    item_id VARCHAR(100) NOT NULL PRIMARY KEY,
+    description TEXT NOT NULL,
+    package_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    availability INT NOT NULL DEFAULT 0,
+    last_synced DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ---------------------------------------------------------
+-- 17. MERCHANTS
+-- SA-linked merchant accounts tracked for ordering,
+-- financial limits, and discount rates.
+-- Populated and refreshed by SASync on startup.
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS merchants (
+    merchant_id VARCHAR(100) NOT NULL PRIMARY KEY,
+    sa_linked BOOLEAN NOT NULL DEFAULT FALSE,
+    sa_status_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    last_sa_check DATETIME,
+    sa_discount_rate DECIMAL(5,4) NOT NULL DEFAULT 0.0000,
+    sa_credit_limit DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    sa_balance DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    last_sa_financial_sync DATETIME
+);
+
+-- ---------------------------------------------------------
+-- Add SA order reference column to restock_orders.
+-- Stores the order ID returned by SASync.placeOrderViaSA()
+-- so we can track + invoice against SA's own order system.
+-- ---------------------------------------------------------
+ALTER TABLE restock_orders ADD COLUMN IF NOT EXISTS sa_order_id VARCHAR(100) NULL;
+

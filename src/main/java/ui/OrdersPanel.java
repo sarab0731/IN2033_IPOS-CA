@@ -7,7 +7,11 @@ import domain.Product;
 import domain.RestockOrder;
 import domain.RestockOrderItem;
 import domain.SACatalogueItem;
+import integration.SAApiClient;
 import integration.SACatalogueService;
+import integration.SASync;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -359,12 +363,27 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
 
         String orderNumber = RestockOrderDB.placeOrder(merchantId, productCart);
         if (orderNumber != null) {
+            // Register the order with the real SA system and store the SA-assigned order ID
+            JSONArray itemsJson = new JSONArray();
+            for (Map.Entry<SACatalogueItem, Integer> entry : cart.entrySet()) {
+                itemsJson.put(new JSONObject()
+                        .put("itemId", entry.getKey().getItemId())
+                        .put("quantity", entry.getValue()));
+            }
+            String saOrderId = SASync.placeOrderViaSA(merchantId,
+                    new JSONObject().put("items", itemsJson).toString());
+            if (saOrderId != null) {
+                RestockOrderDB.updateSAOrderId(orderNumber, saOrderId);
+            }
+
             SACatalogueService.addToBalance(orderTotal);
             refreshMerchantStatus();
             clearOrder();
 
-            int print = JOptionPane.showConfirmDialog(this,
-                    "Order placed with InfoPharma SA.\nOrder: " + orderNumber + "\n\nPrint order form?",
+            String confirmMsg = "Order placed with InfoPharma SA.\nLocal Order: " + orderNumber
+                    + (saOrderId != null ? "\nSA Order ID: " + saOrderId : "\n(SA offline — order queued locally)")
+                    + "\n\nPrint order form?";
+            int print = JOptionPane.showConfirmDialog(this, confirmMsg,
                     "Order Placed", JOptionPane.YES_NO_OPTION);
             if (print == JOptionPane.YES_OPTION) {
                 RestockOrder placed = RestockOrderDB.getByOrderNumber(orderNumber);
@@ -389,11 +408,12 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         styleScrollPane(historyScroll);
         loadOrderHistory(historyModel);
 
-        JButton refreshBtn  = createBtn("Refresh", false);
+        JButton refreshBtn   = createBtn("Refresh", false);
         JButton viewItemsBtn = createBtn("View Items", false);
-        JButton printBtn    = createBtn("Print Order Form", false);
-        JButton invoiceBtn  = createBtn("View Invoice", false);
-        JButton statusBtn   = createBtn("Update Status", true);
+        JButton trackBtn     = createBtn("Track Delivery", false);
+        JButton printBtn     = createBtn("Print Order Form", false);
+        JButton invoiceBtn   = createBtn("View Invoice", false);
+        JButton statusBtn    = createBtn("Update Status", true);
 
         JPanel panel = new JPanel(new BorderLayout(12, 12));
         panel.setBorder(new EmptyBorder(12, 12, 12, 12));
@@ -403,7 +423,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         buttons.setOpaque(false);
         buttons.add(refreshBtn); buttons.add(viewItemsBtn);
-        buttons.add(printBtn); buttons.add(invoiceBtn); buttons.add(statusBtn);
+        buttons.add(trackBtn); buttons.add(printBtn); buttons.add(invoiceBtn); buttons.add(statusBtn);
         panel.add(buttons, BorderLayout.SOUTH);
 
         JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this),
@@ -413,6 +433,23 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         dialog.setLocationRelativeTo(this);
 
         refreshBtn.addActionListener(e -> loadOrderHistory(historyModel));
+
+        trackBtn.addActionListener(e -> {
+            int row = historyTable.getSelectedRow();
+            if (row == -1) { JOptionPane.showMessageDialog(dialog, "Select an order."); return; }
+            int mRow = historyTable.convertRowIndexToModel(row);
+            int selectedOrderId = (int) historyModel.getValueAt(mRow, 0);
+            String saOrderId = RestockOrderDB.getSAOrderId(selectedOrderId);
+            if (saOrderId == null || saOrderId.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog,
+                        "No SA order ID for this order.\nEither SA was offline when the order was placed, or tracking is unavailable.");
+                return;
+            }
+            String tracking = SAApiClient.trackDelivery(saOrderId);
+            JOptionPane.showMessageDialog(dialog,
+                    tracking.isEmpty() ? "No tracking information available from SA." : tracking,
+                    "Delivery Tracking — " + saOrderId, JOptionPane.INFORMATION_MESSAGE);
+        });
 
         viewItemsBtn.addActionListener(e -> {
             int row = historyTable.getSelectedRow();
@@ -434,6 +471,21 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
             int row = historyTable.getSelectedRow();
             if (row == -1) { JOptionPane.showMessageDialog(dialog, "Select an order."); return; }
             int mRow = historyTable.convertRowIndexToModel(row);
+            int selectedOrderId = (int) historyModel.getValueAt(mRow, 0);
+            // Try to fetch the real SA invoice first; fall back to local generation
+            String saOrderId = RestockOrderDB.getSAOrderId(selectedOrderId);
+            if (saOrderId != null && !saOrderId.isEmpty()) {
+                String saInvoice = SAApiClient.getInvoice(saOrderId);
+                if (saInvoice != null && !saInvoice.isEmpty()) {
+                    JTextArea area = new JTextArea(saInvoice);
+                    area.setEditable(false);
+                    area.setFont(new Font("Monospaced", Font.PLAIN, 13));
+                    area.setMargin(new Insets(12, 12, 12, 12));
+                    JOptionPane.showMessageDialog(dialog, new JScrollPane(area),
+                            "SA Invoice — " + saOrderId, JOptionPane.PLAIN_MESSAGE);
+                    return;
+                }
+            }
             showOrderInvoiceDialog(dialog,
                     String.valueOf(historyModel.getValueAt(mRow, 1)),
                     String.valueOf(historyModel.getValueAt(mRow, 2)),
@@ -461,6 +513,8 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
                 for (RestockOrderItem item : delivered) {
                     Product p = ProductDB.getByItemId(item.getItemId());
                     if (p != null) ProductDB.updateStock(p.getProductId(), item.getQuantity());
+                    // Notify SA to deduct stock from its own inventory
+                    SASync.deductSAStock(item.getItemId(), item.getQuantity());
                 }
                 double val = delivered.stream().mapToDouble(RestockOrderItem::getLineTotal).sum();
                 SACatalogueService.recordPayment(val);

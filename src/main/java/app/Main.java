@@ -4,6 +4,7 @@ import database.DatabaseSetup;
 import integration.CAApiServer;
 import integration.PUCachePull;
 import integration.ProductSyncScheduler;
+import integration.SASync;
 import ui.MainFrame;
 
 import javax.swing.*;
@@ -13,7 +14,10 @@ public class Main {
 
         DatabaseSetup.initialise();
         CAApiServer.start();
-        
+
+        // Sync with SA: pull catalogue cache, verify merchant statuses, refresh financials
+        SASync.syncWithSA();
+
         // Pull product cache from PU on startup (gets changes made while CA was offline)
         System.out.println("[Main] Starting CA, pulling cache from PU first...");
         int pulled = PUCachePull.pullCacheFromPU();

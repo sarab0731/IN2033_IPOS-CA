@@ -60,14 +60,15 @@ public class SASync {
             return;
         }
 
+        // Use row alias (MySQL 8.0.19+) to avoid deprecated VALUES() in ON DUPLICATE KEY UPDATE
         String upsertSql =
                 "INSERT INTO sa_catalogue_cache (item_id, description, package_cost, availability, last_synced) " +
-                        "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP()) " +
+                        "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP()) AS new_row " +
                         "ON DUPLICATE KEY UPDATE " +
-                        "  description = VALUES(description), " +
-                        "  package_cost = VALUES(package_cost), " +
-                        "  availability = VALUES(availability), " +
-                        "  last_synced = CURRENT_TIMESTAMP()";
+                        "  description  = new_row.description, " +
+                        "  package_cost = new_row.package_cost, " +
+                        "  availability = new_row.availability, " +
+                        "  last_synced  = CURRENT_TIMESTAMP()";
 
         int synced = 0;
 
