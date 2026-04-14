@@ -89,7 +89,7 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         addNavButton(top, "Reports", MainFrame.SCREEN_REPORTS);
         addNavButton(top, "Reminders", MainFrame.SCREEN_REMINDERS);
         addNavButton(top, "Users", MainFrame.SCREEN_USERS);
-        addNavButton(top, "Discount Plans", MainFrame.SCREEN_DISCOUNT_PLANS);
+        addNavButton(top, "Discount", MainFrame.SCREEN_DISCOUNT_PLANS);
         addNavButton(top, "Templates",      MainFrame.SCREEN_TEMPLATES);
 
         panel.add(top, BorderLayout.NORTH);
@@ -99,28 +99,15 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         bottom.setLayout(new BoxLayout(bottom, BoxLayout.Y_AXIS));
         bottom.setBorder(new EmptyBorder(10, 20, 20, 20));
 
-        JLabel help = new JLabel("Help");
-        JLabel contact = new JLabel("Contact us");
-
-        help.setAlignmentX(Component.LEFT_ALIGNMENT);
-        contact.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        toggleThemeBtn = createSidebarButton("Toggle Theme", ThemeManager::toggleTheme);
+        toggleThemeBtn = createSidebarButton(getThemeToggleLabel(), ThemeManager::toggleTheme);
         logoutBtn = createSidebarButton("Log out", () -> {
             Session.logout();
             router.goTo(MainFrame.SCREEN_LOGIN);
         });
 
-        bottom.add(help);
-        bottom.add(Box.createVerticalStrut(14));
-        bottom.add(contact);
-        bottom.add(Box.createVerticalStrut(18));
         bottom.add(toggleThemeBtn);
         bottom.add(Box.createVerticalStrut(10));
         bottom.add(logoutBtn);
-
-        panel.putClientProperty("helpLabel", help);
-        panel.putClientProperty("contactLabel", contact);
 
         panel.add(bottom, BorderLayout.SOUTH);
         return panel;
@@ -253,6 +240,10 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         btn.setForeground(ThemeManager.textSecondary());
     }
 
+    private String getThemeToggleLabel() {
+        return ThemeManager.isDark() ? "Light Mode" : "Dark Mode";
+    }
+
     private void highlightActiveButton() {
         for (Map.Entry<String, JButton> entry : navButtons.entrySet()) {
             JButton btn = entry.getValue();
@@ -337,15 +328,6 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
 
         if (sidebar != null) {
             sidebar.setBackground(ThemeManager.sidebarBackground());
-            JLabel help = (JLabel) sidebar.getClientProperty("helpLabel");
-            JLabel contact = (JLabel) sidebar.getClientProperty("contactLabel");
-
-            if (help != null) {
-                help.setForeground(ThemeManager.textSecondary());
-            }
-            if (contact != null) {
-                contact.setForeground(ThemeManager.textSecondary());
-            }
         }
 
         if (mainArea != null) {
@@ -379,6 +361,7 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         }
 
         if (toggleThemeBtn != null) {
+            toggleThemeBtn.setText(getThemeToggleLabel());
             applySidebarButtonTheme(toggleThemeBtn);
         }
 
