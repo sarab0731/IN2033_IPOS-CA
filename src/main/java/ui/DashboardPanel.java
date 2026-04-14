@@ -1,6 +1,8 @@
 package ui;
 
 import app.Session;
+import database.ProductDB;
+import domain.Product;
 import domain.User;
 
 import javax.swing.*;
@@ -9,6 +11,8 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 import java.awt.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
@@ -63,6 +67,15 @@ public class DashboardPanel extends JPanel implements ThemeManager.ThemeListener
         );
 
         add(shell, BorderLayout.CENTER);
+
+        addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentShown(ComponentEvent e) {
+                refreshDashboardData();
+            }
+        });
+
+        refreshDashboardData();
         applyTheme();
     }
 
@@ -229,10 +242,10 @@ public class DashboardPanel extends JPanel implements ThemeManager.ThemeListener
         stockTitleLabel = new JLabel("Stock");
         stockTitleLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
 
-        stockSubLabel = new JLabel("0 Low Stock");
+        stockSubLabel = new JLabel();
         stockSubLabel.setFont(new Font("SansSerif", Font.PLAIN, 13));
 
-        stockValueLabel = new JLabel("3");
+        stockValueLabel = new JLabel();
         stockValueLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
 
         stockFooterLabel = new JLabel("");
@@ -247,13 +260,68 @@ public class DashboardPanel extends JPanel implements ThemeManager.ThemeListener
         topRow.add(stockTitleLabel, BorderLayout.WEST);
         topRow.add(arrow, BorderLayout.EAST);
 
-        stockCard.add(topRow);
-        stockCard.add(Box.createVerticalStrut(6));
-        stockCard.add(stockSubLabel);
-        stockCard.add(Box.createVerticalStrut(22));
-        stockCard.add(stockValueLabel);
-        stockCard.add(Box.createVerticalGlue());
-        stockCard.add(stockFooterLabel);
+        JPanel textPanel = new JPanel();
+        textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
+        textPanel.setOpaque(false);
+        textPanel.add(topRow);
+        textPanel.add(Box.createVerticalStrut(6));
+        textPanel.add(stockSubLabel);
+        textPanel.add(Box.createVerticalStrut(10));
+        textPanel.add(stockValueLabel);
+        textPanel.add(Box.createVerticalStrut(6));
+        textPanel.add(stockFooterLabel);
+
+        stockCard.setLayout(new BorderLayout());
+        stockCard.add(textPanel, BorderLayout.CENTER);
+
+        updateStockCard();
+    }
+
+    private void updateStockCard() {
+        if (stockSubLabel == null || stockValueLabel == null || stockFooterLabel == null) {
+            return;
+        }
+
+        int restockCount = 0;
+        int attentionCount = 0;
+        int totalStockItems = 0;
+
+        for (Product product : ProductDB.getAllProducts()) {
+            int stockQuantity = product.getStockQuantity();
+            int minimumStock = product.getMinStockLevel();
+
+            totalStockItems++;
+
+            if (stockQuantity == 0) {
+                restockCount++;
+            }
+
+            if (stockQuantity == 0 || stockQuantity <= minimumStock) {
+                attentionCount++;
+            }
+        }
+
+        stockSubLabel.setText(restockCount + " Restock needed");
+        stockValueLabel.setText(String.valueOf(totalStockItems + " Items"));
+
+        if (attentionCount == 0) {
+            stockFooterLabel.setText("All items are in stock");
+        } else if (attentionCount == 1) {
+            stockFooterLabel.setText("1 item needs attention");
+        } else {
+            stockFooterLabel.setText(attentionCount + " items need attention");
+        }
+
+        if (stockCard != null) {
+            stockCard.revalidate();
+            stockCard.repaint();
+        }
+    }
+
+    private void refreshDashboardData() {
+        updateStockCard();
+        revalidate();
+        repaint();
     }
 
     private void buildOrderStatusCard() {
