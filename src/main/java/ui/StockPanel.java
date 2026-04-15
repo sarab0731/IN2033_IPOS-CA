@@ -540,11 +540,28 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         }
 
         // Notify SA
-        JSONArray itemsJson = new JSONArray();
-        for (Map.Entry<SACatalogueItem, Integer> e : saCart.entrySet())
-            itemsJson.put(new JSONObject().put("itemId", e.getKey().getItemId()).put("quantity", e.getValue()));
-        String saOrderId = SASync.placeOrderViaSA(merchantId,
-                new JSONObject().put("items", itemsJson).toString());
+        List<Product> saOrderItems = new ArrayList<>();
+
+        for (Map.Entry<SACatalogueItem, Integer> e : saCart.entrySet()) {
+            SACatalogueItem sa = e.getKey();
+            int qty = e.getValue();
+
+            int productId = MerchantDB.ensureProduct(sa);
+
+            saOrderItems.add(new Product(
+                    productId,
+                    sa.getItemId(),          // maps to SA itemId
+                    sa.getDescription(),
+                    "Pack of " + sa.getPackSize(),
+                    sa.getPackSize(),
+                    sa.getUnitCost(),
+                    0.0,
+                    qty,                     // ✅ IMPORTANT: quantity goes here
+                    0
+            ));
+        }
+
+        String saOrderId = SASync.placeOrderViaSA(merchantId, saOrderItems);
         if (saOrderId != null) RestockOrderDB.updateSAOrderId(orderNumber, saOrderId);
 
         saCart.clear();

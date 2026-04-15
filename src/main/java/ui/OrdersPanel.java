@@ -510,7 +510,6 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
 
         // Snapshot carts on the EDT before launching background worker
         Map<Product, Integer> productCart = new LinkedHashMap<>();
-        Map<String, Integer> saItemsForApi = new LinkedHashMap<>();
         for (Map.Entry<SACatalogueItem, Integer> entry : cart.entrySet()) {
             SACatalogueItem sa = entry.getKey();
             int qty = entry.getValue();
@@ -519,7 +518,6 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
                     "Pack of " + sa.getPackSize(), sa.getPackSize(),
                     sa.getUnitCost(), 0.0, 0, 0);
             productCart.put(p, qty);
-            saItemsForApi.put(sa.getItemId(), qty);
         }
 
         placeOrderBtn.setEnabled(false);
@@ -531,14 +529,26 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
                 String orderNumber = RestockOrderDB.placeOrder(merchantId, productCart);
                 if (orderNumber == null) return null;
 
-                JSONArray itemsJson = new JSONArray();
-                for (Map.Entry<String, Integer> e : saItemsForApi.entrySet()) {
-                    itemsJson.put(new JSONObject()
-                            .put("itemId", e.getKey())
-                            .put("quantity", e.getValue()));
+                List<Product> saOrderItems = new ArrayList<>();
+
+                for (Map.Entry<Product, Integer> entry : productCart.entrySet()) {
+                    Product p = entry.getKey();
+                    int qty = entry.getValue();
+
+                    saOrderItems.add(new Product(
+                            p.getProductId(),
+                            p.getItemId(),
+                            p.getDescription(),
+                            p.getPackageType(),
+                            p.getUnitsInPack(),
+                            p.getPrice(),
+                            p.getVatRate(),
+                            qty,        // ✅ CRITICAL: quantity goes here
+                            0
+                    ));
                 }
-                String saOrderId = SASync.placeOrderViaSA(merchantId,
-                        new JSONObject().put("items", itemsJson).toString());
+
+                String saOrderId = SASync.placeOrderViaSA(merchantId, saOrderItems);
                 if (saOrderId != null) {
                     RestockOrderDB.updateSAOrderId(orderNumber, saOrderId);
                 }

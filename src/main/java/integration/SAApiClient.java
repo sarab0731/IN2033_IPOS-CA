@@ -8,6 +8,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 
 /**
  * HTTP client for communicating with the IPOS-SA subsystem.
@@ -88,14 +90,16 @@ public class SAApiClient {
     /**
      * Places an order via SA.
      * @param merchantId   the merchant placing the order
-     * @param orderDetails order details string
+     * @param items items in order
      * @return the order ID assigned by SA, or null on failure
      */
-    public static String placeOrder(String merchantId, String orderDetails) {
+
+    // '{"merchantId":"M001","items":[{"itemId":"100 00001","quantity":10},{"itemId":"100 00002","quantity":5}]}', [System.Text.Encoding]::UTF8)
+    public static String placeOrder(String merchantId, JSONArray items) {
         try {
             JSONObject payload = new JSONObject()
-                    .put("merchantID", merchantId)
-                    .put("orderDetails", orderDetails);
+                    .put("merchantId", merchantId)
+                    .put("items", items);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(BASE_URL + "/api/orders/place"))
@@ -104,6 +108,7 @@ public class SAApiClient {
                     .build();
 
             HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+
             if (response.statusCode() == 200) {
                 JSONObject body = new JSONObject(response.body());
                 return body.optString("orderId", null);
@@ -113,7 +118,6 @@ public class SAApiClient {
         }
         return null;
     }
-
     /**
      * Tracks delivery status of an SA order.
      * @param orderId the SA order ID

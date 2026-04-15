@@ -209,14 +209,39 @@ public class SASync {
      * @param orderDetails order details string
      * @return the SA order ID, or null on failure
      */
-    public static String placeOrderViaSA(String merchantId, String orderDetails) {
+    /**
+     * Places an order through SA on behalf of a merchant.
+     *
+     * @param merchantId the merchant ID
+     * @param items      list of items (each item must contain itemId + quantity)
+     * @return the SA order ID, or null on failure
+     */
+    public static String placeOrderViaSA(String merchantId, List<Product> items) {
         System.out.println("[SASync] Placing order via SA for merchant " + merchantId + "...");
-        String orderId = SAApiClient.placeOrder(merchantId, orderDetails);
-        if (orderId != null) {
-            System.out.println("[SASync] SA order placed: " + orderId);
-        } else {
-            System.err.println("[SASync] Failed to place SA order for merchant " + merchantId);
+
+        try {
+            JSONArray itemsArray = new JSONArray();
+
+            for (Product p : items) {
+                JSONObject item = new JSONObject()
+                        .put("itemId", p.getProductId())
+                        .put("quantity", p.getStockQuantity());
+                itemsArray.put(item);
+            }
+
+            String orderId = SAApiClient.placeOrder(merchantId, itemsArray);
+
+            if (orderId != null) {
+                System.out.println("[SASync] SA order placed: " + orderId);
+            } else {
+                System.err.println("[SASync] Failed to place SA order for merchant " + merchantId);
+            }
+
+            return orderId;
+
+        } catch (Exception e) {
+            System.err.println("[SASync] Error building SA order payload: " + e.getMessage());
+            return null;
         }
-        return orderId;
     }
 }
