@@ -29,7 +29,7 @@ services:
       DB_USER: root
       DB_PASSWORD: Password123
       PU_BASE_URL: http://host.docker.internal:8080
-      SA_BASE_URL: http://host.docker.internal:8082
+      SA_BASE_URL: http://host.docker.internal:8081
     depends_on:
       mysql:
         condition: service_healthy
