@@ -1,6 +1,7 @@
 package integration;
 
 import database.DatabaseManager;
+import database.MerchantDB;
 import database.ProductDB;
 import domain.Product;
 import org.json.JSONArray;
@@ -60,14 +61,15 @@ public class SASync {
             return;
         }
 
+        // Use row alias (MySQL 8.0.19+) to avoid deprecated VALUES() in ON DUPLICATE KEY UPDATE
         String upsertSql =
                 "INSERT INTO sa_catalogue_cache (item_id, description, package_cost, availability, last_synced) " +
-                        "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP()) " +
+                        "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP()) AS new_row " +
                         "ON DUPLICATE KEY UPDATE " +
-                        "  description = VALUES(description), " +
-                        "  package_cost = VALUES(package_cost), " +
-                        "  availability = VALUES(availability), " +
-                        "  last_synced = CURRENT_TIMESTAMP()";
+                        "  description  = new_row.description, " +
+                        "  package_cost = new_row.package_cost, " +
+                        "  availability = new_row.availability, " +
+                        "  last_synced  = CURRENT_TIMESTAMP()";
 
         int synced = 0;
 
@@ -95,31 +97,28 @@ public class SASync {
     // ==================== STEP 2: MERCHANT STATUS SYNC ====================
 
     /**
-     * Iterates over CA's known merchants and verifies each one is still
-     * marked as "active" in SA. If SA reports a merchant is no longer active,
-     * CA flags them locally so that new orders are blocked until resolved.
+     * Checks each known merchant's account status with SA and persists the result.
+     * Uses MerchantDB.updateStatus() to keep the sa_account_status column current.
      */
     private static void syncMerchantStatuses() {
         System.out.println("[SASync] Verifying merchant account statuses with SA...");
 
-        String selectSql = "SELECT merchant_id FROM merchants WHERE sa_linked = 1";
-        String updateSql = "UPDATE merchants SET sa_status_verified = ?, last_sa_check = CURRENT_TIMESTAMP() WHERE merchant_id = ?";
-
+        String selectSql = "SELECT merchant_id FROM merchants";
         int checked = 0;
         int flagged = 0;
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement selectStmt = conn.prepareStatement(selectSql);
-             ResultSet rs = selectStmt.executeQuery();
-             PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+             ResultSet rs = selectStmt.executeQuery()) {
 
             while (rs.next()) {
                 String merchantId = rs.getString("merchant_id");
-                boolean isActive = SAApiClient.checkAccountStatus(merchantId, "active");
+                // SA stores lowercase status: "normal", "suspended", "in_default"
+                boolean isActive = SAApiClient.checkAccountStatus(merchantId, "normal");
 
-                updateStmt.setBoolean(1, isActive);
-                updateStmt.setString(2, merchantId);
-                updateStmt.executeUpdate();
+                // Derive status; MerchantDB.updateStatus() will uppercase before storing
+                String accountStatus = isActive ? "normal" : "suspended";
+                MerchantDB.updateStatus(merchantId, isActive, accountStatus);
                 checked++;
 
                 if (!isActive) {
@@ -138,47 +137,34 @@ public class SASync {
     // ==================== STEP 3: FINANCIAL DATA SYNC ====================
 
     /**
-     * Refreshes cached discount rates, credit limits, and account balances
-     * for all SA-linked merchants. This allows CA to apply correct pricing
-     * and enforce credit checks without real-time SA calls on every order.
+     * Refreshes discount rates, credit limits, and balances for all merchants.
+     * Uses MerchantDB.updateFinancials() so the data is available to the UI without
+     * real-time SA calls on every order.
      */
     private static void syncMerchantFinancials() {
         System.out.println("[SASync] Refreshing merchant financial data from SA...");
 
-        String selectSql = "SELECT merchant_id FROM merchants WHERE sa_linked = 1";
-        String updateSql =
-                "UPDATE merchants SET " +
-                        "  sa_discount_rate = ?, " +
-                        "  sa_credit_limit = ?, " +
-                        "  sa_balance = ?, " +
-                        "  last_sa_financial_sync = CURRENT_TIMESTAMP() " +
-                        "WHERE merchant_id = ?";
-
+        String selectSql = "SELECT merchant_id FROM merchants";
         int updated = 0;
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement selectStmt = conn.prepareStatement(selectSql);
-             ResultSet rs = selectStmt.executeQuery();
-             PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+             ResultSet rs = selectStmt.executeQuery()) {
 
             while (rs.next()) {
                 String merchantId = rs.getString("merchant_id");
 
                 double discountRate = SAApiClient.getDiscountRate(merchantId);
-                double creditLimit = SAApiClient.getCreditLimit(merchantId);
-                double balance = SAApiClient.getBalance(merchantId);
+                double creditLimit  = SAApiClient.getCreditLimit(merchantId);
+                double balance      = SAApiClient.getBalance(merchantId);
 
-                // Only update if we got valid responses (balance returns -1 on failure)
+                // Skip if SA unreachable (balance returns -1 on failure)
                 if (balance < 0) {
                     System.out.println("[SASync] Skipping financials for merchant " + merchantId + " (SA unreachable).");
                     continue;
                 }
 
-                updateStmt.setDouble(1, discountRate);
-                updateStmt.setDouble(2, creditLimit);
-                updateStmt.setDouble(3, balance);
-                updateStmt.setString(4, merchantId);
-                updateStmt.executeUpdate();
+                MerchantDB.updateFinancials(merchantId, discountRate, creditLimit, balance);
                 updated++;
             }
 

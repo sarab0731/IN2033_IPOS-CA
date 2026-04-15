@@ -1,13 +1,18 @@
 package ui;
 
 import app.Session;
+import database.MerchantDB;
 import database.ProductDB;
 import database.RestockOrderDB;
+import domain.Merchant;
 import domain.Product;
 import domain.RestockOrder;
 import domain.RestockOrderItem;
 import domain.SACatalogueItem;
-import integration.SACatalogueService;
+import integration.SAApiClient;
+import integration.SASync;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -55,7 +60,6 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
     private JLabel outstandingValue;
     private JLabel accountStatusLabel;
 
-    private JComboBox<String> categoryCombo;
     private JTextField searchField;
 
     private DefaultTableModel catalogueModel;
@@ -103,25 +107,19 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         addToOrderBtn = createBtn("+  Add To Order", true);
         removeItemBtn = createBtn("Remove Item", false);
 
-        categoryCombo = new JComboBox<>(SACatalogueService.getCategories().toArray(new String[0]));
-        categoryCombo.setFont(new Font("SansSerif", Font.PLAIN, 13));
-        categoryCombo.setPreferredSize(new Dimension(160, 36));
-
         searchField = new JTextField("Search catalogue...");
-        searchField.setPreferredSize(new Dimension(170, 36));
+        searchField.setPreferredSize(new Dimension(200, 36));
         searchField.setFont(new Font("SansSerif", Font.PLAIN, 13));
         searchField.setForeground(Color.GRAY);
 
         leftButtons.add(addToOrderBtn);
         leftButtons.add(removeItemBtn);
-        leftButtons.add(new JLabel("  Category:"));
-        leftButtons.add(categoryCombo);
         leftButtons.add(searchField);
 
         JPanel rightMerchant = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
         rightMerchant.setOpaque(false);
         merchantIdLabel = new JLabel("Merchant ID:");
-        merchantIdValue = new JLabel("MERCHANT-001");
+        merchantIdValue = new JLabel(Session.hasMerchant() ? Session.getMerchantId() : "Not configured");
         merchantIdValue.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(ThemeManager.borderColor()),
                 new EmptyBorder(6, 12, 6, 12)));
@@ -145,7 +143,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         orderSummaryLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
 
         catalogueModel = new DefaultTableModel(
-                new String[]{"Item ID", "Description", "Category", "Unit Cost £", "Pack Size", "Manufacturer"}, 0
+                new String[]{"Item ID", "Description", "Unit Cost £", "Available (packs)"}, 0
         ) { @Override public boolean isCellEditable(int r, int c) { return false; } };
         catalogueTable = new JTable(catalogueModel);
 
@@ -215,7 +213,6 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         placeNewOrderTab.addActionListener(e ->
                 JOptionPane.showMessageDialog(this, "You are already on Place New Order."));
         orderHistoryTab.addActionListener(e -> showOrderHistoryDialog());
-        categoryCombo.addActionListener(e -> loadCatalogue());
 
         searchField.addFocusListener(new java.awt.event.FocusAdapter() {
             @Override public void focusGained(java.awt.event.FocusEvent e) {
@@ -243,8 +240,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
     }
 
     private void loadCatalogue() {
-        String category = (String) categoryCombo.getSelectedItem();
-        currentCatalogue = SACatalogueService.getCatalogueByCategory(category);
+        currentCatalogue = MerchantDB.getCatalogueItems();
         populateCatalogueTable(currentCatalogue);
     }
 
@@ -256,8 +252,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         List<SACatalogueItem> filtered = new ArrayList<>();
         for (SACatalogueItem item : currentCatalogue) {
             if (item.getDescription().toLowerCase().contains(kw)
-                    || item.getItemId().toLowerCase().contains(kw)
-                    || item.getCategory().toLowerCase().contains(kw))
+                    || item.getItemId().toLowerCase().contains(kw))
                 filtered.add(item);
         }
         populateCatalogueTable(filtered);
@@ -267,9 +262,9 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         catalogueModel.setRowCount(0);
         for (SACatalogueItem item : items) {
             catalogueModel.addRow(new Object[]{
-                    item.getItemId(), item.getDescription(), item.getCategory(),
+                    item.getItemId(), item.getDescription(),
                     String.format("%.2f", item.getUnitCost()),
-                    item.getPackSize(), item.getManufacturer()
+                    item.getAvailability()
             });
         }
     }
@@ -329,20 +324,18 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         if (cart.isEmpty()) { JOptionPane.showMessageDialog(this, "Order is empty."); return; }
 
         // GATE: supplier account must be NORMAL
-        if (!SACatalogueService.isAccountNormal()) {
+        Merchant merchant = Session.getMerchant();
+        if (merchant == null || !merchant.isAccountNormal()) {
+            String statusMsg = merchant != null ? merchant.getSaAccountStatus() : "Not configured";
             JOptionPane.showMessageDialog(this,
-                    "Cannot place order.\n\nSupplier account status: "
-                            + SACatalogueService.getAccountStatus().name()
+                    "Cannot place order.\n\nSupplier account status: " + statusMsg
                             + "\n\nOrders can only be placed when the supplier account is NORMAL.\n"
                             + "Please settle your outstanding balance first.",
                     "Supplier Account Restricted", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
-        String merchantId = JOptionPane.showInputDialog(this, "Merchant ID:", merchantIdValue.getText());
-        if (merchantId == null || merchantId.trim().isEmpty()) return;
-        merchantId = merchantId.trim();
-        merchantIdValue.setText(merchantId);
+        String merchantId = Session.getMerchantId();
 
         // Convert SA catalogue items to Product map for RestockOrderDB
         Map<Product, Integer> productCart = new LinkedHashMap<>();
@@ -350,7 +343,8 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         for (Map.Entry<SACatalogueItem, Integer> entry : cart.entrySet()) {
             SACatalogueItem sa = entry.getKey();
             int qty = entry.getValue();
-            Product p = new Product(0, sa.getItemId(), sa.getDescription(),
+            int productId = MerchantDB.ensureProduct(sa);
+            Product p = new Product(productId, sa.getItemId(), sa.getDescription(),
                     "Pack of " + sa.getPackSize(), sa.getPackSize(),
                     sa.getUnitCost(), 0.0, 0, 0);
             productCart.put(p, qty);
@@ -359,12 +353,26 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
 
         String orderNumber = RestockOrderDB.placeOrder(merchantId, productCart);
         if (orderNumber != null) {
-            SACatalogueService.addToBalance(orderTotal);
+            // Register the order with the real SA system and store the SA-assigned order ID
+            JSONArray itemsJson = new JSONArray();
+            for (Map.Entry<SACatalogueItem, Integer> entry : cart.entrySet()) {
+                itemsJson.put(new JSONObject()
+                        .put("itemId", entry.getKey().getItemId())
+                        .put("quantity", entry.getValue()));
+            }
+            String saOrderId = SASync.placeOrderViaSA(merchantId,
+                    new JSONObject().put("items", itemsJson).toString());
+            if (saOrderId != null) {
+                RestockOrderDB.updateSAOrderId(orderNumber, saOrderId);
+            }
+
             refreshMerchantStatus();
             clearOrder();
 
-            int print = JOptionPane.showConfirmDialog(this,
-                    "Order placed with InfoPharma SA.\nOrder: " + orderNumber + "\n\nPrint order form?",
+            String confirmMsg = "Order placed with InfoPharma SA.\nLocal Order: " + orderNumber
+                    + (saOrderId != null ? "\nSA Order ID: " + saOrderId : "\n(SA offline — order queued locally)")
+                    + "\n\nPrint order form?";
+            int print = JOptionPane.showConfirmDialog(this, confirmMsg,
                     "Order Placed", JOptionPane.YES_NO_OPTION);
             if (print == JOptionPane.YES_OPTION) {
                 RestockOrder placed = RestockOrderDB.getByOrderNumber(orderNumber);
@@ -389,11 +397,12 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         styleScrollPane(historyScroll);
         loadOrderHistory(historyModel);
 
-        JButton refreshBtn  = createBtn("Refresh", false);
+        JButton refreshBtn   = createBtn("Refresh", false);
         JButton viewItemsBtn = createBtn("View Items", false);
-        JButton printBtn    = createBtn("Print Order Form", false);
-        JButton invoiceBtn  = createBtn("View Invoice", false);
-        JButton statusBtn   = createBtn("Update Status", true);
+        JButton trackBtn     = createBtn("Track Delivery", false);
+        JButton printBtn     = createBtn("Print Order Form", false);
+        JButton invoiceBtn   = createBtn("View Invoice", false);
+        JButton statusBtn    = createBtn("Update Status", true);
 
         JPanel panel = new JPanel(new BorderLayout(12, 12));
         panel.setBorder(new EmptyBorder(12, 12, 12, 12));
@@ -403,7 +412,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         buttons.setOpaque(false);
         buttons.add(refreshBtn); buttons.add(viewItemsBtn);
-        buttons.add(printBtn); buttons.add(invoiceBtn); buttons.add(statusBtn);
+        buttons.add(trackBtn); buttons.add(printBtn); buttons.add(invoiceBtn); buttons.add(statusBtn);
         panel.add(buttons, BorderLayout.SOUTH);
 
         JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this),
@@ -413,6 +422,23 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         dialog.setLocationRelativeTo(this);
 
         refreshBtn.addActionListener(e -> loadOrderHistory(historyModel));
+
+        trackBtn.addActionListener(e -> {
+            int row = historyTable.getSelectedRow();
+            if (row == -1) { JOptionPane.showMessageDialog(dialog, "Select an order."); return; }
+            int mRow = historyTable.convertRowIndexToModel(row);
+            int selectedOrderId = (int) historyModel.getValueAt(mRow, 0);
+            String saOrderId = RestockOrderDB.getSAOrderId(selectedOrderId);
+            if (saOrderId == null || saOrderId.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog,
+                        "No SA order ID for this order.\nEither SA was offline when the order was placed, or tracking is unavailable.");
+                return;
+            }
+            String tracking = SAApiClient.trackDelivery(saOrderId);
+            JOptionPane.showMessageDialog(dialog,
+                    tracking.isEmpty() ? "No tracking information available from SA." : tracking,
+                    "Delivery Tracking — " + saOrderId, JOptionPane.INFORMATION_MESSAGE);
+        });
 
         viewItemsBtn.addActionListener(e -> {
             int row = historyTable.getSelectedRow();
@@ -434,6 +460,21 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
             int row = historyTable.getSelectedRow();
             if (row == -1) { JOptionPane.showMessageDialog(dialog, "Select an order."); return; }
             int mRow = historyTable.convertRowIndexToModel(row);
+            int selectedOrderId = (int) historyModel.getValueAt(mRow, 0);
+            // Try to fetch the real SA invoice first; fall back to local generation
+            String saOrderId = RestockOrderDB.getSAOrderId(selectedOrderId);
+            if (saOrderId != null && !saOrderId.isEmpty()) {
+                String saInvoice = SAApiClient.getInvoice(saOrderId);
+                if (saInvoice != null && !saInvoice.isEmpty()) {
+                    JTextArea area = new JTextArea(saInvoice);
+                    area.setEditable(false);
+                    area.setFont(new Font("Monospaced", Font.PLAIN, 13));
+                    area.setMargin(new Insets(12, 12, 12, 12));
+                    JOptionPane.showMessageDialog(dialog, new JScrollPane(area),
+                            "SA Invoice — " + saOrderId, JOptionPane.PLAIN_MESSAGE);
+                    return;
+                }
+            }
             showOrderInvoiceDialog(dialog,
                     String.valueOf(historyModel.getValueAt(mRow, 1)),
                     String.valueOf(historyModel.getValueAt(mRow, 2)),
@@ -461,9 +502,9 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
                 for (RestockOrderItem item : delivered) {
                     Product p = ProductDB.getByItemId(item.getItemId());
                     if (p != null) ProductDB.updateStock(p.getProductId(), item.getQuantity());
+                    // Notify SA to deduct stock from its own inventory
+                    SASync.deductSAStock(item.getItemId(), item.getQuantity());
                 }
-                double val = delivered.stream().mapToDouble(RestockOrderItem::getLineTotal).sum();
-                SACatalogueService.recordPayment(val);
                 refreshMerchantStatus();
                 JOptionPane.showMessageDialog(dialog, "Delivery recorded. Stock updated for " + delivered.size() + " product(s).");
             }
@@ -542,44 +583,47 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
     private void refreshMerchantStatus() {
         if (activeOrdersValue == null) return;
         activeOrdersValue.setText(String.valueOf(RestockOrderDB.getActiveOrderCount()));
-        outstandingValue.setText(String.format("£%.2f", SACatalogueService.getAccountBalance()));
-        if (accountStatusLabel != null) {
-            SACatalogueService.AccountStatus s = SACatalogueService.getAccountStatus();
-            accountStatusLabel.setText(s.name());
-            switch (s) {
-                case NORMAL     -> accountStatusLabel.setForeground(new Color(34, 139, 34));
-                case SUSPENDED  -> accountStatusLabel.setForeground(new Color(210, 140, 0));
-                case IN_DEFAULT -> accountStatusLabel.setForeground(new Color(180, 50, 50));
+        Merchant m = Session.getMerchant();
+        if (m != null) {
+            outstandingValue.setText(String.format("£%.2f", m.getSaBalance()));
+            if (accountStatusLabel != null) {
+                String status = m.getSaAccountStatus();
+                accountStatusLabel.setText(status);
+                switch (status) {
+                    case "NORMAL"     -> accountStatusLabel.setForeground(new Color(34, 139, 34));
+                    case "SUSPENDED"  -> accountStatusLabel.setForeground(new Color(210, 140, 0));
+                    case "IN_DEFAULT" -> accountStatusLabel.setForeground(new Color(180, 50, 50));
+                    default           -> accountStatusLabel.setForeground(ThemeManager.textPrimary());
+                }
+            }
+        } else {
+            outstandingValue.setText("N/A");
+            if (accountStatusLabel != null) {
+                accountStatusLabel.setText("Not configured");
+                accountStatusLabel.setForeground(ThemeManager.textPrimary());
             }
         }
     }
 
     private void showAccountBalanceDialog() {
-        JOptionPane.showMessageDialog(this,
-                SACatalogueService.getAccountStatusSummary(),
-                "InfoPharma SA — Account Details", JOptionPane.INFORMATION_MESSAGE);
+        Merchant m = Session.getMerchant();
+        if (m == null) { JOptionPane.showMessageDialog(this, "No merchant configured."); return; }
+        String msg = String.format(
+                "Merchant ID      : %s\nAccount Status   : %s\nDiscount Rate    : %.1f%%\n" +
+                "Credit Limit     : £%.2f\nCurrent Balance  : £%.2f\nAvailable Credit : £%.2f",
+                m.getMerchantId(), m.getSaAccountStatus(), m.getSaDiscountRate() * 100,
+                m.getSaCreditLimit(), m.getSaBalance(), m.getAvailableCredit());
+        JOptionPane.showMessageDialog(this, msg, "InfoPharma SA — Account Details", JOptionPane.INFORMATION_MESSAGE);
     }
 
     private void showSettleAccountDialog() {
-        double balance = SACatalogueService.getAccountBalance();
+        Merchant m = Session.getMerchant();
+        if (m == null) { JOptionPane.showMessageDialog(this, "No merchant configured."); return; }
+        double balance = m.getSaBalance();
         if (balance == 0) { JOptionPane.showMessageDialog(this, "No outstanding balance."); return; }
-        JTextField amtField = new JTextField(String.format("%.2f", balance));
-        int r = JOptionPane.showConfirmDialog(this,
-                new Object[]{"Current SA Balance: £" + String.format("%.2f", balance), "Payment Amount £:", amtField},
-                "Record Payment to InfoPharma SA", JOptionPane.OK_CANCEL_OPTION);
-        if (r != JOptionPane.OK_OPTION) return;
-        try {
-            double amt = Double.parseDouble(amtField.getText().trim());
-            if (amt <= 0) throw new NumberFormatException();
-            SACatalogueService.recordPayment(amt);
-            refreshMerchantStatus();
-            JOptionPane.showMessageDialog(this,
-                    "Payment of £" + String.format("%.2f", amt) + " recorded.\n"
-                            + "New balance: £" + String.format("%.2f", SACatalogueService.getAccountBalance()) + "\n"
-                            + "Status: " + SACatalogueService.getAccountStatus().name());
-        } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Please enter a valid amount.");
-        }
+        JOptionPane.showMessageDialog(this,
+                String.format("Current SA Balance: £%.2f\n\nPayments must be made directly with InfoPharma SA.\nThe balance shown here will update on the next SA sync.", balance),
+                "SA Account Balance", JOptionPane.INFORMATION_MESSAGE);
     }
 
     private void showOrderInvoiceDialog(java.awt.Window parent, String orderNumber,

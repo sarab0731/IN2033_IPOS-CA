@@ -345,13 +345,13 @@ public class SaleDB {
         String sql = """
             SELECT COALESCE(SUM(total_amount), 0)
             FROM sales
-            WHERE DATE(sale_datetime) >= DATE('now', ?)
+            WHERE DATE(sale_datetime) >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
             """;
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setString(1, "-" + days + " day");
+            stmt.setInt(1, days);
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) return rs.getDouble(1);
 

@@ -31,9 +31,32 @@ public class DatabaseSetup {
             System.out.println("Database initialised.");
 
             seedDefaultUsers(conn);
+            seedDefaultMerchant(conn);
 
             // Note: Sync with PU is now handled in Main.java after pull completes
 
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void seedDefaultMerchant(Connection conn) {
+        try {
+            ResultSet rs = conn.createStatement()
+                    .executeQuery("SELECT COUNT(*) FROM merchants");
+            rs.next();
+            if (rs.getInt(1) > 0) return;  // already configured
+
+            // M001 is a real merchant in SA's database (MedSupply Ltd)
+            String sql = "INSERT INTO merchants " +
+                         "(merchant_id, sa_linked, sa_status_verified, sa_account_status) " +
+                         "VALUES (?, TRUE, FALSE, 'NORMAL')";
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, "M001");
+            stmt.executeUpdate();
+
+            conn.commit();
+            System.out.println("Default merchant seeded (ID: M001 — MedSupply Ltd on SA).");
         } catch (Exception e) {
             e.printStackTrace();
         }

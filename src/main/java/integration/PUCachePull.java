@@ -92,9 +92,11 @@ public class PUCachePull {
             System.out.println("[PUCachePull] Pull complete: " + updated + " updated, " + added + " added");
             return updated + added;
             
+        } catch (java.net.ConnectException e) {
+            System.err.println("[PUCachePull] PU is offline — skipping cache pull.");
+            return 0;
         } catch (Exception e) {
             System.err.println("[PUCachePull] Error pulling cache: " + e.getMessage());
-            e.printStackTrace();
             return 0;
         }
     }
