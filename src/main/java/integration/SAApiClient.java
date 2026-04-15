@@ -35,6 +35,25 @@ public class SAApiClient {
             .connectTimeout(Duration.ofSeconds(5))
             .build();
 
+    // ==================== HEALTH CHECK ====================
+
+    /**
+     * Returns true if SA is reachable (any HTTP response received).
+     * Used to avoid falsely modifying merchant statuses when SA is offline.
+     */
+    public static boolean isReachable() {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(BASE_URL + "/api/inventory/catalogue"))
+                    .GET()
+                    .build();
+            HTTP.send(request, HttpResponse.BodyHandlers.discarding());
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     // ==================== INVENTORY ====================
 
     /**
@@ -94,20 +113,23 @@ public class SAApiClient {
      * @return the order ID assigned by SA, or null on failure
      */
 
-    // '{"merchantId":"M001","items":[{"itemId":"100 00001","quantity":10},{"itemId":"100 00002","quantity":5}]}', [System.Text.Encoding]::UTF8)
     public static String placeOrder(String merchantId, JSONArray items) {
         try {
-            JSONObject payload = new JSONObject()
+            // SA expects: { "merchantId": "M001", "items": [{...}] }
+            String json = new JSONObject()
                     .put("merchantId", merchantId)
-                    .put("items", items);
+                    .put("items", items)
+                    .toString();
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(BASE_URL + "/api/orders/place"))
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                    .POST(HttpRequest.BodyPublishers.ofString(json))
+                    .timeout(Duration.ofSeconds(30))
                     .build();
 
             HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+            System.out.println("[SAApiClient] placeOrder response: " + response.statusCode() + " - " + response.body());
 
             if (response.statusCode() == 200) {
                 JSONObject body = new JSONObject(response.body());

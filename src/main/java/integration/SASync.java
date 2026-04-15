@@ -102,6 +102,10 @@ public class SASync {
      */
     private static void syncMerchantStatuses() {
         System.out.println("[SASync] Verifying merchant account statuses with SA...");
+        if (!SAApiClient.isReachable()) {
+            System.out.println("[SASync] SA is offline — skipping status sync to preserve existing account statuses.");
+            return;
+        }
 
         String selectSql = "SELECT merchant_id FROM merchants";
         int checked = 0;
@@ -224,7 +228,7 @@ public class SASync {
 
             for (Product p : items) {
                 JSONObject item = new JSONObject()
-                        .put("itemId", p.getProductId())
+                        .put("itemId", p.getItemId())
                         .put("quantity", p.getStockQuantity());
                 itemsArray.put(item);
             }

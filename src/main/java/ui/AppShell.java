@@ -1,6 +1,7 @@
 package ui;
 
 import app.Session;
+import domain.Merchant;
 import domain.User;
 
 import javax.swing.*;
@@ -137,7 +138,24 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 0));
         right.setOpaque(false);
 
-
+        JLabel infoIcon = new JLabel("ℹ");
+        infoIcon.setFont(new Font("SansSerif", Font.BOLD, 17));
+        infoIcon.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        infoIcon.setToolTipText("Merchant details");
+        infoIcon.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                showMerchantInfoPopup(infoIcon);
+            }
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                infoIcon.setForeground(ThemeManager.buttonDark());
+            }
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                infoIcon.setForeground(ThemeManager.textPrimary());
+            }
+        });
 
         JLabel bell = new JLabel("🔔");
         bell.setFont(new Font("SansSerif", Font.PLAIN, 16));
@@ -148,6 +166,7 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         userNameLabel = new JLabel("Username");
         userNameLabel.setFont(new Font("SansSerif", Font.PLAIN, 13));
 
+        right.add(infoIcon);
         right.add(bell);
         right.add(avatar);
         right.add(userNameLabel);
@@ -375,6 +394,57 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         SwingUtilities.updateComponentTreeUI(this);
         repaint();
         revalidate();
+    }
+
+    private void showMerchantInfoPopup(JLabel anchor) {
+        Merchant m = Session.getMerchant();
+
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBackground(ThemeManager.panelBackground());
+        panel.setBorder(new EmptyBorder(14, 18, 14, 18));
+
+        if (m == null) {
+            JLabel none = new JLabel("No merchant account configured.");
+            none.setFont(new Font("SansSerif", Font.PLAIN, 13));
+            none.setForeground(ThemeManager.textSecondary());
+            panel.add(none);
+        } else {
+            String statusColor = switch (m.getSaAccountStatus()) {
+                case "NORMAL"     -> "#228b22";
+                case "SUSPENDED"  -> "#d28c00";
+                case "IN_DEFAULT" -> "#b43232";
+                default           -> "#888888";
+            };
+            String html = String.format("""
+                <html>
+                <table cellpadding="3" style="font-family:SansSerif;font-size:13px;">
+                  <tr><td><b>Company</b></td><td>%s</td></tr>
+                  <tr><td><b>Merchant ID</b></td><td>%s</td></tr>
+                  <tr><td><b>Reg. Number</b></td><td>%s</td></tr>
+                  <tr><td><b>Email</b></td><td>%s</td></tr>
+                  <tr><td><b>Phone</b></td><td>%s</td></tr>
+                  <tr><td><b>Address</b></td><td>%s</td></tr>
+                  <tr><td><b>SA Status</b></td><td><font color='%s'><b>%s</b></font></td></tr>
+                  <tr><td><b>Discount</b></td><td>%.2f%%</td></tr>
+                  <tr><td><b>Credit Limit</b></td><td>&pound;%.2f</td></tr>
+                  <tr><td><b>Balance</b></td><td>&pound;%.2f</td></tr>
+                </table>
+                </html>""",
+                m.getCompanyName(), m.getMerchantId(), m.getRegistrationNumber(),
+                m.getEmail(), m.getPhone(), m.getAddress(),
+                statusColor, m.getSaAccountStatus(),
+                m.getSaDiscountRate(), m.getSaCreditLimit(), m.getSaBalance());
+            JLabel lbl = new JLabel(html);
+            panel.add(lbl);
+        }
+
+        JPopupMenu popup = new JPopupMenu();
+        popup.setLayout(new BorderLayout());
+        popup.add(panel, BorderLayout.CENTER);
+        popup.setBorder(BorderFactory.createLineBorder(ThemeManager.borderColor()));
+
+        popup.show(anchor, 0, anchor.getHeight() + 4);
     }
 
     public static JPanel createCard() {

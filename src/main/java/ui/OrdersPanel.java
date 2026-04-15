@@ -624,11 +624,19 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         JLabel lbl = new JLabel("Grand Total: £" + String.format("%.2f", total));
         lbl.setFont(new Font("SansSerif", Font.BOLD, 13));
         lbl.setBorder(new EmptyBorder(8, 0, 0, 0));
+        JButton closeBtn = createBtn("Close", false);
+        JPanel bottomPanel = new JPanel(new BorderLayout(8, 0));
+        bottomPanel.setOpaque(false);
+        bottomPanel.add(lbl, BorderLayout.WEST);
+        bottomPanel.add(closeBtn, BorderLayout.EAST);
+
         JPanel c = new JPanel(new BorderLayout(8, 8));
         c.setBorder(new EmptyBorder(12, 12, 12, 12));
         c.setBackground(ThemeManager.panelBackground());
-        c.add(sp, BorderLayout.CENTER); c.add(lbl, BorderLayout.SOUTH);
+        c.add(sp, BorderLayout.CENTER); c.add(bottomPanel, BorderLayout.SOUTH);
         JDialog d = new JDialog(parent, "Order Items", Dialog.ModalityType.APPLICATION_MODAL);
+        closeBtn.addActionListener(e -> d.dispose());
+        d.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
         d.setContentPane(c); d.pack(); d.setLocationRelativeTo(parent); d.setVisible(true);
     }
 
