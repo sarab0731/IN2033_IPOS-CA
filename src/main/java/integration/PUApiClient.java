@@ -33,7 +33,6 @@ public class PUApiClient {
     public static List<PUOrder> getOnlineOrders() {
         List<PUOrder> orders = new ArrayList<>();
         try {
-            System.out.println("test");
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(BASE_URL + "/api/orders/undelivered"))
                     .GET()
@@ -43,7 +42,6 @@ public class PUApiClient {
             if (response.statusCode() == 200) {
                 JSONArray arr = new JSONArray(response.body());
                 for (int i = 0; i < arr.length(); i++) {
-                    System.out.println(arr.getJSONObject(i));
                     orders.add(parseOrder(arr.getJSONObject(i)));
                 }
             }
@@ -188,7 +186,6 @@ public class PUApiClient {
                     .build();
 
             HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
-            System.out.println("[PUApiClient] pushProductsToCache response: " + response.body());
             return response.statusCode() >= 200 && response.statusCode() < 300;
         } catch (Exception e) {
             System.err.println("[PUApiClient] pushProductsToCache failed: " + e.getMessage());

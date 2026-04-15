@@ -61,29 +61,18 @@ public class ProductSyncScheduler {
                 obj.put("vatRate", p.getVatRate());
                 obj.put("stockQuantity", p.getStockQuantity());
                 obj.put("minStockLevel", p.getMinStockLevel());
-                obj.put("isActive", 1); // Only active products are synced
+                obj.put("isActive", 1);
                 productsJson.put(obj);
-                
-                // Log each product being synced
-                System.out.println("[ProductSyncScheduler] Preparing product: " + p.getItemId() + 
-                    " - stock=" + p.getStockQuantity() + ", price=" + p.getPrice());
             }
 
             // 3. Push to PU cache
-            String jsonString = productsJson.toString();
-            System.out.println("[ProductSyncScheduler] Sending " + products.size() + " products to PU, JSON size: " + jsonString.length() + " bytes");
-            
-            boolean success = PUApiClient.pushProductsToCache(jsonString);
-            
+            boolean success = PUApiClient.pushProductsToCache(productsJson.toString());
             if (success) {
-                System.out.println("[ProductSyncScheduler] Successfully synced " + products.size() + " products to PU cache");
-            } else {
-                System.err.println("[ProductSyncScheduler] Failed to sync products to PU");
+                System.out.println("[ProductSyncScheduler] Synced " + products.size() + " products to PU.");
             }
 
         } catch (Exception e) {
-            System.err.println("[ProductSyncScheduler] Error during sync: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("[ProductSyncScheduler] Sync failed: " + e.getMessage());
         }
     }
 }

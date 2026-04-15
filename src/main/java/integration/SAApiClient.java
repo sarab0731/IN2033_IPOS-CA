@@ -27,7 +27,8 @@ import java.time.Duration;
  */
 public class SAApiClient {
 
-    private static final String BASE_URL = "http://localhost:8082";
+    private static final String BASE_URL =
+            System.getenv().getOrDefault("SA_BASE_URL", "http://localhost:8082");
     private static final HttpClient HTTP = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
             .build();

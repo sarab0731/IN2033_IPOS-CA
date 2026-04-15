@@ -2,6 +2,8 @@ services:
 
   mysql:
     image: mysql:8.0
+    ports:
+      - "3309:3306"   # MySQL (3306/3307/3308 in use)
     environment:
       MYSQL_ROOT_PASSWORD: Password123
       MYSQL_DATABASE: IPOS-CA
@@ -20,13 +22,14 @@ services:
     build: .
     ports:
       - "6080:6080"   # noVNC web GUI (open in browser)
-      - "5900:5900"   # VNC direct access
-      - "8082:8082"   # Embedded REST API
+      - "5901:5900"   # VNC direct access
+      - "8083:8081"   # Embedded REST API (host:8083 → container:8081)
     environment:
       DB_URL: jdbc:mysql://mysql:3306/IPOS-CA
       DB_USER: root
       DB_PASSWORD: Password123
       PU_BASE_URL: http://host.docker.internal:8080
+      SA_BASE_URL: http://host.docker.internal:8082
     depends_on:
       mysql:
         condition: service_healthy

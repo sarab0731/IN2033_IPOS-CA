@@ -189,6 +189,7 @@ CREATE TABLE IF NOT EXISTS restock_orders (
     merchant_id VARCHAR(100),
     status VARCHAR(20) NOT NULL DEFAULT 'ACCEPTED',
     total_value DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    sa_order_id VARCHAR(100) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CHECK (status IN ('ACCEPTED', 'PROCESSED', 'DISPATCHED', 'DELIVERED')),
     CHECK (total_value >= 0)
@@ -318,10 +319,4 @@ CREATE TABLE IF NOT EXISTS merchants (
     last_sa_financial_sync DATETIME
 );
 
--- ---------------------------------------------------------
--- Add SA order reference column to restock_orders.
--- Stores the order ID returned by SASync.placeOrderViaSA()
--- so we can track + invoice against SA's own order system.
--- ---------------------------------------------------------
-ALTER TABLE restock_orders ADD COLUMN IF NOT EXISTS sa_order_id VARCHAR(100) NULL;
 

@@ -33,6 +33,6 @@ COPY database/ ./database/
 COPY start.sh .
 RUN chmod +x start.sh
 
-EXPOSE 5900 6080 8082
+EXPOSE 5900 6080 8081
 
 ENTRYPOINT ["./start.sh"]
