@@ -20,9 +20,12 @@ public class Session {
     // ── Merchant (SA account) ─────────────────────────────────────────────────
 
     public static void setMerchant(Merchant m)  { merchant = m; }
-    public static Merchant getMerchant()         { return merchant; }
-    public static String   getMerchantId()       { return merchant != null ? merchant.getMerchantId() : null; }
-    public static boolean  hasMerchant()         { return merchant != null; }
+    public static Merchant getMerchant() {
+        if (merchant == null) merchant = database.MerchantDB.getConfiguredMerchant();
+        return merchant;
+    }
+    public static String   getMerchantId()       { return getMerchant() != null ? getMerchant().getMerchantId() : null; }
+    public static boolean  hasMerchant()         { return getMerchant() != null; }
 
     public static User getCurrentUser() {
         return currentUser;

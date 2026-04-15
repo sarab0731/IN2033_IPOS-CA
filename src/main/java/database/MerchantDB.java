@@ -17,14 +17,51 @@ public class MerchantDB {
      */
     public static Merchant getConfiguredMerchant() {
         String sql = "SELECT * FROM merchants LIMIT 1";
-        try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
-            if (rs.next()) return mapRow(rs);
+        try (Connection conn = DatabaseManager.getConnection()) {
+            try (PreparedStatement stmt = conn.prepareStatement(sql);
+                 ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) return mapRow(rs);
+            }
+            // Table is empty — seed M001 and return it
+            seedM001(conn);
+            try (PreparedStatement stmt = conn.prepareStatement(sql);
+                 ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) return mapRow(rs);
+            }
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("[MerchantDB] getConfiguredMerchant failed: " + e.getMessage());
         }
-        return null;
+        // Last resort: return a default in-memory merchant so the UI is never blocked
+        return new Merchant("M001", "Cosymed Ltd", "12345678",
+                "info@cosymed.com", "0208 778 0124", "3, High Level Drive, Sydenham, SE26 3ET",
+                true, false, "NORMAL", 5.00, 5000.00, 0.00);
+    }
+
+    /** Called by DatabaseSetup during initialisation. */
+    public static void seedM001Public(Connection conn) { seedM001(conn); }
+
+    private static void seedM001(Connection conn) {
+        // Upsert M001 — always fill in identity fields so they are never blank.
+        // Identity data matches SA's merchant table exactly (M001 = Cosymed Ltd).
+        try {
+            conn.createStatement().executeUpdate(
+                "INSERT INTO merchants " +
+                "  (merchant_id, company_name, registration_number, email, phone, address, " +
+                "   sa_linked, sa_status_verified, sa_account_status, " +
+                "   sa_credit_limit, sa_balance, sa_discount_rate) " +
+                "VALUES " +
+                "  ('M001', 'Cosymed Ltd', '12345678', 'info@cosymed.com', " +
+                "   '0208 778 0124', '3, High Level Drive, Sydenham, SE26 3ET', " +
+                "   TRUE, FALSE, 'NORMAL', 5000.00, 0.00, 5.00) " +
+                "ON DUPLICATE KEY UPDATE " +
+                "  company_name        = VALUES(company_name), " +
+                "  registration_number = VALUES(registration_number), " +
+                "  email               = VALUES(email), " +
+                "  phone               = VALUES(phone), " +
+                "  address             = VALUES(address)");
+        } catch (Exception e) {
+            System.err.println("[MerchantDB] seedM001 failed: " + e.getMessage());
+        }
     }
 
     // ── Updates called by SASync ──────────────────────────────────────────────
@@ -141,11 +178,25 @@ public class MerchantDB {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static Merchant mapRow(ResultSet rs) throws SQLException {
+        // Columns added in later schema versions get a safe fallback if missing
+        String accountStatus = "NORMAL";
+        String companyName   = "";
+        String regNumber     = "";
+        String email         = "";
+        String phone         = "";
+        String address       = "";
+        try { accountStatus = rs.getString("sa_account_status"); } catch (SQLException ignored) {}
+        try { companyName   = rs.getString("company_name");       } catch (SQLException ignored) {}
+        try { regNumber     = rs.getString("registration_number");} catch (SQLException ignored) {}
+        try { email         = rs.getString("email");              } catch (SQLException ignored) {}
+        try { phone         = rs.getString("phone");              } catch (SQLException ignored) {}
+        try { address       = rs.getString("address");            } catch (SQLException ignored) {}
         return new Merchant(
                 rs.getString("merchant_id"),
+                companyName, regNumber, email, phone, address,
                 rs.getBoolean("sa_linked"),
                 rs.getBoolean("sa_status_verified"),
-                rs.getString("sa_account_status"),
+                accountStatus,
                 rs.getDouble("sa_discount_rate"),
                 rs.getDouble("sa_credit_limit"),
                 rs.getDouble("sa_balance")
