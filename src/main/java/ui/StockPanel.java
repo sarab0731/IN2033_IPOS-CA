@@ -303,7 +303,9 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
     private void wireActions() {
         // Tab switching
         localStockTab.addActionListener(e  -> switchTab(CARD_LOCAL));
-        saCatalogueTab.addActionListener(e -> switchTab(CARD_SA));
+        // "Order Stock" navigates to the full Order Management screen rather than
+        // showing a duplicate ordering UI inline.
+        saCatalogueTab.addActionListener(e -> router.goTo(MainFrame.SCREEN_ORDERS));
 
         // Local stock
         refreshBtn.addActionListener(e -> loadTable());

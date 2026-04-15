@@ -333,5 +333,6 @@ ALTER TABLE merchants ADD COLUMN IF NOT EXISTS registration_number VARCHAR(100);
 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS email               VARCHAR(255);
 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS phone               VARCHAR(20);
 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS address             TEXT;
+ALTER TABLE restock_orders ADD COLUMN IF NOT EXISTS sa_order_id   VARCHAR(100) NULL;
 
 

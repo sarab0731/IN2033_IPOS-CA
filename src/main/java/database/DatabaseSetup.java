@@ -34,6 +34,10 @@ public class DatabaseSetup {
             conn.commit();
             System.out.println("Database initialised.");
 
+            // Run Java-based migrations as a safety net — works on all MySQL versions
+            // by using information_schema to check existence before altering.
+            runMigrations();
+
             seedDefaultUsers(conn);
             seedDefaultMerchant(conn);
 
@@ -41,6 +45,40 @@ public class DatabaseSetup {
 
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * Ensures all required columns exist, using information_schema lookups so the
+     * check is idempotent and compatible with every MySQL 5.x / 8.x version.
+     */
+    private static void runMigrations() {
+        addColumnIfMissing("merchants",      "company_name",        "VARCHAR(255) NOT NULL DEFAULT ''");
+        addColumnIfMissing("merchants",      "registration_number", "VARCHAR(100)");
+        addColumnIfMissing("merchants",      "email",               "VARCHAR(255)");
+        addColumnIfMissing("merchants",      "phone",               "VARCHAR(20)");
+        addColumnIfMissing("merchants",      "address",             "TEXT");
+        addColumnIfMissing("merchants",      "sa_account_status",   "VARCHAR(20) NOT NULL DEFAULT 'NORMAL'");
+        addColumnIfMissing("restock_orders", "sa_order_id",         "VARCHAR(100) NULL");
+    }
+
+    private static void addColumnIfMissing(String table, String column, String definition) {
+        try (Connection conn = DatabaseManager.getConnection()) {
+            String checkSql =
+                    "SELECT COUNT(*) FROM information_schema.COLUMNS " +
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?";
+            PreparedStatement check = conn.prepareStatement(checkSql);
+            check.setString(1, table);
+            check.setString(2, column);
+            ResultSet rs = check.executeQuery();
+            rs.next();
+            if (rs.getInt(1) == 0) {
+                conn.createStatement().executeUpdate(
+                        "ALTER TABLE `" + table + "` ADD COLUMN `" + column + "` " + definition);
+                System.out.println("[DatabaseSetup] Migration: added " + table + "." + column);
+            }
+        } catch (Exception e) {
+            System.err.println("[DatabaseSetup] Migration failed for " + table + "." + column + ": " + e.getMessage());
         }
     }
 

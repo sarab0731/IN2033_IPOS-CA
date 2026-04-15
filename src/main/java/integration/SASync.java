@@ -114,16 +114,22 @@ public class SASync {
             while (rs.next()) {
                 String merchantId = rs.getString("merchant_id");
                 // SA stores lowercase status: "normal", "suspended", "in_default"
-                boolean isActive = SAApiClient.checkAccountStatus(merchantId, "normal");
-
-                // Derive status; MerchantDB.updateStatus() will uppercase before storing
-                String accountStatus = isActive ? "normal" : "suspended";
-                MerchantDB.updateStatus(merchantId, isActive, accountStatus);
+                // Check each possible status so we don't mis-label IN_DEFAULT as SUSPENDED
+                boolean isNormal = SAApiClient.checkAccountStatus(merchantId, "normal");
+                String accountStatus;
+                if (isNormal) {
+                    accountStatus = "NORMAL";
+                } else {
+                    boolean isInDefault = SAApiClient.checkAccountStatus(merchantId, "in_default");
+                    accountStatus = isInDefault ? "IN_DEFAULT" : "SUSPENDED";
+                }
+                // MerchantDB.updateStatus() uppercases accountStatus before storing
+                MerchantDB.updateStatus(merchantId, isNormal, accountStatus);
                 checked++;
 
-                if (!isActive) {
+                if (!isNormal) {
                     flagged++;
-                    System.out.println("[SASync] Merchant " + merchantId + " is NOT active in SA.");
+                    System.out.println("[SASync] Merchant " + merchantId + " is NOT active in SA (status: " + accountStatus + ").");
                 }
             }
 
