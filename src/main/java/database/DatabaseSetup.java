@@ -23,7 +23,11 @@ public class DatabaseSetup {
             for (String s : statements) {
                 String trimmed = s.trim();
                 if (!trimmed.isEmpty()) {
-                    stmt.executeUpdate(trimmed);
+                    try {
+                        stmt.executeUpdate(trimmed);
+                    } catch (Exception stmtEx) {
+                        System.err.println("[DatabaseSetup] Skipping statement (error: " + stmtEx.getMessage() + "): " + trimmed.substring(0, Math.min(80, trimmed.length())));
+                    }
                 }
             }
 
@@ -42,21 +46,9 @@ public class DatabaseSetup {
 
     private static void seedDefaultMerchant(Connection conn) {
         try {
-            ResultSet rs = conn.createStatement()
-                    .executeQuery("SELECT COUNT(*) FROM merchants");
-            rs.next();
-            if (rs.getInt(1) > 0) return;  // already configured
-
-            // M001 is a real merchant in SA's database (MedSupply Ltd)
-            String sql = "INSERT INTO merchants " +
-                         "(merchant_id, sa_linked, sa_status_verified, sa_account_status) " +
-                         "VALUES (?, TRUE, FALSE, 'NORMAL')";
-            PreparedStatement stmt = conn.prepareStatement(sql);
-            stmt.setString(1, "M001");
-            stmt.executeUpdate();
-
+            database.MerchantDB.seedM001Public(conn);
             conn.commit();
-            System.out.println("Default merchant seeded (ID: M001 — MedSupply Ltd on SA).");
+            System.out.println("Merchant M001 (Cosymed Ltd) seeded/updated.");
         } catch (Exception e) {
             e.printStackTrace();
         }

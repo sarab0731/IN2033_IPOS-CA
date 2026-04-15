@@ -41,7 +41,6 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
     private JLabel warningLabel;
     private JTable table;
     private JScrollPane scrollPane;
-    private JButton orderStockBtn;
     private JButton editBtn;
     private JButton deleteBtn;
     private JButton restockBtn;
@@ -51,6 +50,8 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
     private DefaultTableModel tableModel;
     private final List<Product> allProducts     = new ArrayList<>();
     private final List<Product> visibleProducts = new ArrayList<>();
+    private int currentPage = 1;
+    private static final int PAGE_SIZE = 15;
 
     // ── SA Catalogue components ──────────────────────────────────────────────
     private JTable saTable;
@@ -119,8 +120,8 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
     private JPanel buildTabBar() {
         JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         bar.setOpaque(false);
-        localStockTab  = createTabButton("Local Stock",   true);
-        saCatalogueTab = createTabButton("SA Catalogue",  false);
+        localStockTab  = createTabButton("Local Stock",  true);
+        saCatalogueTab = createTabButton("Order Stock",  false);
         bar.add(localStockTab);
         bar.add(Box.createHorizontalStrut(8));
         bar.add(saCatalogueTab);
@@ -159,11 +160,6 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         topToolbar = new JPanel(new BorderLayout());
         topToolbar.setOpaque(false);
 
-        orderStockBtn = createPillButton("+  Add Stock", true);
-        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        left.setOpaque(false);
-        left.add(orderStockBtn);
-
         filterCombo = new JComboBox<>(new String[]{"All Stocks", "Good", "Low Stock", "Restock"});
         sortCombo   = new JComboBox<>(new String[]{
                 "Sort by: Quantity", "Sort by: Stock ID", "Sort by: Price", "Sort by: Description"
@@ -174,7 +170,6 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         right.add(filterCombo);
         right.add(sortCombo);
 
-        topToolbar.add(left,  BorderLayout.WEST);
         topToolbar.add(right, BorderLayout.EAST);
     }
 
@@ -189,10 +184,9 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
     }
 
     private void buildFooter() {
-        footerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+        footerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
         footerPanel.setOpaque(false);
-        for (String s : new String[]{"1", "2", "3", "4", "5", "...", "20"})
-            footerPanel.add(createPageChip(s, "1".equals(s)));
+        // Chips are built dynamically by refreshFooter() after each table refresh
     }
 
     private void buildBottomActionBar() {
@@ -229,7 +223,7 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
 
         JPanel rightControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         rightControls.setOpaque(false);
-        String mid = Session.hasMerchant() ? Session.getMerchantId() : "Not configured";
+        String mid = Session.hasMerchant() ? Session.getMerchant().getDisplayName() : "Not configured";
         merchantIdLabel = new JLabel(mid);
         merchantIdLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
         rightControls.add(new JLabel("Merchant ID:"));
@@ -313,7 +307,6 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
 
         // Local stock
         refreshBtn.addActionListener(e -> loadTable());
-        orderStockBtn.addActionListener(e -> showAddDialog());
 
         editBtn.addActionListener(e -> {
             int idx = getSelectedVisibleIndex();
@@ -344,8 +337,8 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
             }
         });
 
-        filterCombo.addActionListener(e -> refreshTableView());
-        sortCombo.addActionListener(e -> refreshTableView());
+        filterCombo.addActionListener(e -> { currentPage = 1; refreshTableView(); });
+        sortCombo.addActionListener(e ->   { currentPage = 1; refreshTableView(); });
 
         // SA Catalogue
         saSearchField.addFocusListener(new java.awt.event.FocusAdapter() {
@@ -598,7 +591,13 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
             case "Sort by: Description" -> filtered.sort(Comparator.comparing(Product::getDescription, String.CASE_INSENSITIVE_ORDER));
         }
 
-        visibleProducts.addAll(filtered);
+        // Pagination
+        int totalPages = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
+        currentPage = Math.max(1, Math.min(currentPage, totalPages));
+        int from = (currentPage - 1) * PAGE_SIZE;
+        int to   = Math.min(from + PAGE_SIZE, filtered.size());
+
+        visibleProducts.addAll(filtered.subList(from, to));
         for (Product p : visibleProducts)
             tableModel.addRow(new Object[]{
                     String.format("%03d", p.getProductId()),
@@ -609,7 +608,50 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
                     getStatusText(p)
             });
 
+        refreshFooter(totalPages);
         applyTheme();
+    }
+
+    private void refreshFooter(int totalPages) {
+        if (footerPanel == null) return;
+        footerPanel.removeAll();
+
+        // Prev arrow
+        JButton prev = createPageChip("‹", false);
+        prev.setEnabled(currentPage > 1);
+        if (currentPage > 1) prev.addActionListener(e -> { currentPage--; refreshTableView(); });
+        footerPanel.add(prev);
+
+        // Page window: up to 5 pages centred on currentPage
+        int start = Math.max(1, currentPage - 2);
+        int end   = Math.min(totalPages, start + 4);
+        start     = Math.max(1, end - 4);
+
+        if (start > 1) {
+            footerPanel.add(createPageChipWithAction("1", 1 == currentPage, 1));
+            if (start > 2) { JButton dots = createPageChip("…", false); dots.setEnabled(false); footerPanel.add(dots); }
+        }
+        for (int i = start; i <= end; i++)
+            footerPanel.add(createPageChipWithAction(String.valueOf(i), i == currentPage, i));
+        if (end < totalPages) {
+            if (end < totalPages - 1) { JButton dots = createPageChip("…", false); dots.setEnabled(false); footerPanel.add(dots); }
+            footerPanel.add(createPageChipWithAction(String.valueOf(totalPages), totalPages == currentPage, totalPages));
+        }
+
+        // Next arrow
+        JButton next = createPageChip("›", false);
+        next.setEnabled(currentPage < totalPages);
+        if (currentPage < totalPages) next.addActionListener(e -> { currentPage++; refreshTableView(); });
+        footerPanel.add(next);
+
+        footerPanel.revalidate();
+        footerPanel.repaint();
+    }
+
+    private JButton createPageChipWithAction(String text, boolean active, int page) {
+        JButton btn = createPageChip(text, active);
+        if (!active) btn.addActionListener(e -> { currentPage = page; refreshTableView(); });
+        return btn;
     }
 
     private String getStatusText(Product p) {
@@ -625,17 +667,6 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
     }
 
     // ── Dialogs ──────────────────────────────────────────────────────────────
-
-    private void showAddDialog() {
-        ProductFormDialog dlg = new ProductFormDialog(
-                SwingUtilities.getWindowAncestor(this), "Order / Add Stock", true, null);
-        dlg.setVisible(true);
-        if (!dlg.isConfirmed()) return;
-        Product p = new Product(0, dlg.getItemId(), dlg.getDescriptionText(), dlg.getPackageType(),
-                dlg.getUnitsInPack(), dlg.getPrice(), dlg.getVatRate(), dlg.getStockQuantity(), dlg.getMinimumStock());
-        if (ProductDB.addProduct(p)) loadTable();
-        else JOptionPane.showMessageDialog(this, "Could not add product. Check that the Item ID is unique.");
-    }
 
     private void showEditDialog(Product product) {
         Product fresh = ProductDB.getById(product.getProductId());
@@ -726,7 +757,6 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         if (warningLabel    != null) warningLabel.setForeground(ProductDB.getLowStockCount() > 0
                 ? new Color(190, 76, 76) : ThemeManager.textSecondary());
 
-        if (orderStockBtn != null) stylePillButton(orderStockBtn, true);
         if (editBtn    != null) stylePillButton(editBtn,    false);
         if (deleteBtn  != null) stylePillButton(deleteBtn,  false);
         if (restockBtn != null) stylePillButton(restockBtn, false);

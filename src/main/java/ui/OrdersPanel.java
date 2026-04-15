@@ -119,7 +119,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         JPanel rightMerchant = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
         rightMerchant.setOpaque(false);
         merchantIdLabel = new JLabel("Merchant ID:");
-        merchantIdValue = new JLabel(Session.hasMerchant() ? Session.getMerchantId() : "Not configured");
+        merchantIdValue = new JLabel(Session.hasMerchant() ? Session.getMerchant().getDisplayName() : "Not configured");
         merchantIdValue.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(ThemeManager.borderColor()),
                 new EmptyBorder(6, 12, 6, 12)));
@@ -609,9 +609,14 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         Merchant m = Session.getMerchant();
         if (m == null) { JOptionPane.showMessageDialog(this, "No merchant configured."); return; }
         String msg = String.format(
-                "Merchant ID      : %s\nAccount Status   : %s\nDiscount Rate    : %.1f%%\n" +
-                "Credit Limit     : £%.2f\nCurrent Balance  : £%.2f\nAvailable Credit : £%.2f",
-                m.getMerchantId(), m.getSaAccountStatus(), m.getSaDiscountRate() * 100,
+                "Company          : %s\nMerchant ID      : %s\nReg. Number      : %s\n" +
+                "Email            : %s\nPhone            : %s\nAddress          : %s\n" +
+                "─────────────────────────────────────────\n" +
+                "Account Status   : %s\nDiscount Rate    : %.2f%%\n" +
+                "Credit Limit     : £%.2f\nOutstanding      : £%.2f\nAvailable Credit : £%.2f",
+                m.getCompanyName(), m.getMerchantId(), m.getRegistrationNumber(),
+                m.getEmail(), m.getPhone(), m.getAddress(),
+                m.getSaAccountStatus(), m.getSaDiscountRate(),
                 m.getSaCreditLimit(), m.getSaBalance(), m.getAvailableCredit());
         JOptionPane.showMessageDialog(this, msg, "InfoPharma SA — Account Details", JOptionPane.INFORMATION_MESSAGE);
     }
