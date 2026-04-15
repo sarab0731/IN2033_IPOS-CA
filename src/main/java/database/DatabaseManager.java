@@ -42,10 +42,16 @@ public class DatabaseManager {
             }
         }
 
-        // 3. Final fallback: hardcoded defaults so the app never refuses to start
-        URL      = props.getProperty("db.url",      "jdbc:mysql://localhost:3306/IPOS-CA");
-        USER     = props.getProperty("db.user",     "root");
-        PASSWORD = props.getProperty("db.password", "root");
+        // check docker env vars
+        String envUrl  = System.getenv("DB_URL");
+        String envUser = System.getenv("DB_USER");
+        String envPass = System.getenv("DB_PASSWORD");
+
+        URL      = (envUrl  != null && !envUrl.isEmpty())  ? envUrl  : props.getProperty("db.url",      "jdbc:mysql://localhost:3306/IPOS-CA");
+        USER     = (envUser != null && !envUser.isEmpty()) ? envUser : props.getProperty("db.user",     "root");
+        PASSWORD = (envPass != null && !envPass.isEmpty()) ? envPass : props.getProperty("db.password", "root");
+
+        System.out.println("[DatabaseManager] Connecting to: " + URL + " as " + USER);
     }
 
     public static Connection getConnection() throws SQLException {

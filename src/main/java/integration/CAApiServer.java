@@ -31,7 +31,7 @@ import java.util.concurrent.Executors;
  */
 public class CAApiServer {
 
-    private static final int PORT = 8083;
+    private static final int PORT = 8082;
 
     public static void start() {
         try {
