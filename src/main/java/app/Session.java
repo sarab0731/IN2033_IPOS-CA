@@ -1,10 +1,12 @@
 package app;
 
+import domain.Merchant;
 import domain.User;
 
 public class Session {
 
-    private static User currentUser;
+    private static User     currentUser;
+    private static Merchant merchant;     // the single SA merchant account for this CA
 
     public static void login(User user) {
         currentUser = user;
@@ -12,7 +14,15 @@ public class Session {
 
     public static void logout() {
         currentUser = null;
+        // merchant stays — it is pharmacy-level config, not user-level
     }
+
+    // ── Merchant (SA account) ─────────────────────────────────────────────────
+
+    public static void setMerchant(Merchant m)  { merchant = m; }
+    public static Merchant getMerchant()         { return merchant; }
+    public static String   getMerchantId()       { return merchant != null ? merchant.getMerchantId() : null; }
+    public static boolean  hasMerchant()         { return merchant != null; }
 
     public static User getCurrentUser() {
         return currentUser;

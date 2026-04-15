@@ -312,11 +312,13 @@ CREATE TABLE IF NOT EXISTS merchants (
     merchant_id VARCHAR(100) NOT NULL PRIMARY KEY,
     sa_linked BOOLEAN NOT NULL DEFAULT FALSE,
     sa_status_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    sa_account_status VARCHAR(20) NOT NULL DEFAULT 'NORMAL',
     last_sa_check DATETIME,
     sa_discount_rate DECIMAL(5,4) NOT NULL DEFAULT 0.0000,
     sa_credit_limit DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     sa_balance DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    last_sa_financial_sync DATETIME
+    last_sa_financial_sync DATETIME,
+    CHECK (sa_account_status IN ('NORMAL', 'SUSPENDED', 'IN_DEFAULT'))
 );
 
 

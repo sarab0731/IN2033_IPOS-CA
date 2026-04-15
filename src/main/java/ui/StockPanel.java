@@ -1,11 +1,12 @@
 package ui;
 
 import app.Session;
+import database.MerchantDB;
 import database.ProductDB;
 import database.RestockOrderDB;
+import domain.Merchant;
 import domain.Product;
 import domain.SACatalogueItem;
-import integration.SACatalogueService;
 import integration.SASync;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -59,8 +60,7 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
     private JScrollPane saCartScrollPane;
     private DefaultTableModel saCartModel;
     private JTextField saSearchField;
-    private JComboBox<String> saCategoryCombo;
-    private JTextField merchantIdField;
+    private JLabel merchantIdLabel;
     private JLabel saCartTotalLabel;
     private JButton saAddToCartBtn;
     private JButton saRemoveBtn;
@@ -220,24 +220,20 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
 
         JPanel leftControls = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         leftControls.setOpaque(false);
-        saCategoryCombo = new JComboBox<>(SACatalogueService.getCategories().toArray(new String[0]));
-        saCategoryCombo.setPreferredSize(new Dimension(160, 36));
-        saCategoryCombo.setFont(new Font("SansSerif", Font.PLAIN, 13));
         saSearchField = new JTextField("Search catalogue...");
-        saSearchField.setPreferredSize(new Dimension(200, 36));
+        saSearchField.setPreferredSize(new Dimension(260, 36));
         saSearchField.setFont(new Font("SansSerif", Font.PLAIN, 13));
         saSearchField.setForeground(Color.GRAY);
-        leftControls.add(new JLabel("Category:"));
-        leftControls.add(saCategoryCombo);
+        leftControls.add(new JLabel("Search:"));
         leftControls.add(saSearchField);
 
         JPanel rightControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         rightControls.setOpaque(false);
-        merchantIdField = new JTextField("MERCHANT-001");
-        merchantIdField.setPreferredSize(new Dimension(140, 36));
-        merchantIdField.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        String mid = Session.hasMerchant() ? Session.getMerchantId() : "Not configured";
+        merchantIdLabel = new JLabel(mid);
+        merchantIdLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
         rightControls.add(new JLabel("Merchant ID:"));
-        rightControls.add(merchantIdField);
+        rightControls.add(merchantIdLabel);
 
         controls.add(leftControls,  BorderLayout.WEST);
         controls.add(rightControls, BorderLayout.EAST);
@@ -253,7 +249,7 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         JLabel catLabel = new JLabel("InfoPharma SA Catalogue");
         catLabel.setFont(new Font("SansSerif", Font.BOLD, 15));
         saTableModel = new DefaultTableModel(
-                new String[]{"Item ID", "Description", "Category", "Unit Cost £", "Pack Size"}, 0
+                new String[]{"Item ID", "Description", "Unit Cost £", "Available (packs)"}, 0
         ) { @Override public boolean isCellEditable(int r, int c) { return false; } };
         saTable = new JTable(saTableModel);
         configureSATable(saTable);
@@ -352,8 +348,6 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         sortCombo.addActionListener(e -> refreshTableView());
 
         // SA Catalogue
-        saCategoryCombo.addActionListener(e -> loadSACatalogue());
-
         saSearchField.addFocusListener(new java.awt.event.FocusAdapter() {
             @Override public void focusGained(java.awt.event.FocusEvent e) {
                 if ("Search catalogue...".equals(saSearchField.getText())) {
@@ -389,14 +383,47 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         localStockTab.setForeground(local  ? ThemeManager.textLight()   : ThemeManager.textPrimary());
         saCatalogueTab.setBackground(!local ? ThemeManager.buttonDark() : ThemeManager.buttonLight());
         saCatalogueTab.setForeground(!local ? ThemeManager.textLight()  : ThemeManager.textPrimary());
+        updateBanner(card);
+    }
+
+    /** Updates the footer banner to reflect the active tab's context. */
+    private void updateBanner(String card) {
+        if (warningLabel == null) return;
+        if (CARD_SA.equals(card)) {
+            if (!Session.hasMerchant()) {
+                warningLabel.setForeground(Color.ORANGE.darker());
+                warningLabel.setText("  SA merchant account not configured. Contact InfoPharma to register.");
+                return;
+            }
+            Merchant m = Session.getMerchant();
+            if (m.isAccountNormal()) {
+                warningLabel.setForeground(ThemeManager.textPrimary());
+                warningLabel.setText(String.format(
+                        "  SA Account: %s  |  Balance: £%.2f  |  Credit Limit: £%.2f  |  Available: £%.2f",
+                        m.getMerchantId(), m.getSaBalance(), m.getSaCreditLimit(), m.getAvailableCredit()));
+            } else {
+                warningLabel.setForeground(Color.RED);
+                warningLabel.setText(String.format(
+                        "  WARNING: SA account %s. Balance: £%.2f. Orders are blocked until the account is restored.",
+                        m.getSaAccountStatus(), m.getSaBalance()));
+            }
+        } else {
+            // Local stock tab — reuse the low-stock message already set by loadTable()
+            int low = ProductDB.getLowStockCount();
+            warningLabel.setForeground(low > 0 ? Color.ORANGE.darker() : ThemeManager.textPrimary());
+            warningLabel.setText(low > 0
+                    ? "  Warning: " + low + " product(s) are at or below minimum stock."
+                    : "  All products are above minimum stock.");
+        }
     }
 
     // ── SA Catalogue logic ───────────────────────────────────────────────────
 
     private void loadSACatalogue() {
-        String cat = saCategoryCombo != null ? (String) saCategoryCombo.getSelectedItem() : "All";
         saCatalogueAll.clear();
-        saCatalogueAll.addAll(SACatalogueService.getCatalogueByCategory(cat));
+        // Load from the local SA catalogue cache (populated by SASync at startup).
+        // If SA was offline at startup the table will be empty until next sync.
+        saCatalogueAll.addAll(MerchantDB.getCatalogueItems());
         filterSACatalogue();
     }
 
@@ -419,8 +446,10 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         saTableModel.setRowCount(0);
         for (SACatalogueItem i : items)
             saTableModel.addRow(new Object[]{
-                    i.getItemId(), i.getDescription(), i.getCategory(),
-                    String.format("%.2f", i.getUnitCost()), i.getPackSize()
+                    i.getItemId(),
+                    i.getDescription(),
+                    String.format("£%.2f", i.getUnitCost()),
+                    i.getAvailability()
             });
     }
 
@@ -468,26 +497,42 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
             JOptionPane.showMessageDialog(this, "Only Managers and Admins can place orders.");
             return;
         }
-        if (saCart.isEmpty()) { JOptionPane.showMessageDialog(this, "Add items to the order first."); return; }
-
-        if (!SACatalogueService.isAccountNormal()) {
+        if (saCart.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Add items to the order first.");
+            return;
+        }
+        if (!Session.hasMerchant()) {
             JOptionPane.showMessageDialog(this,
-                    "Cannot place order.\nSupplier account status: " + SACatalogueService.getAccountStatus().name()
+                    "No SA merchant account configured.\nPlease contact your InfoPharma SA administrator.",
+                    "SA Not Configured", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        Merchant merchant = Session.getMerchant();
+        if (!merchant.isAccountNormal()) {
+            JOptionPane.showMessageDialog(this,
+                    "Cannot place order.\nSA account status: " + merchant.getSaAccountStatus()
                     + "\nPlease settle the outstanding balance first.",
                     "Account Restricted", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
-        String merchantId = merchantIdField.getText().trim();
-        if (merchantId.isEmpty()) { JOptionPane.showMessageDialog(this, "Enter a Merchant ID."); return; }
+        String merchantId = merchant.getMerchantId();
 
-        // Build product map for RestockOrderDB
+        // Resolve real product_ids — SA items are upserted into products (stock=0)
+        // so the restock_order_items FK is satisfied, and stock increments on delivery.
         Map<Product, Integer> productCart = new LinkedHashMap<>();
         double orderTotal = 0;
         for (Map.Entry<SACatalogueItem, Integer> e : saCart.entrySet()) {
-            SACatalogueItem sa = e.getKey();
-            int qty = e.getValue();
-            productCart.put(new Product(0, sa.getItemId(), sa.getDescription(),
+            SACatalogueItem sa  = e.getKey();
+            int             qty = e.getValue();
+            int productId = MerchantDB.ensureProduct(sa);
+            if (productId == -1) {
+                JOptionPane.showMessageDialog(this,
+                        "Failed to register product " + sa.getItemId() + ". Order aborted.");
+                return;
+            }
+            productCart.put(new Product(productId, sa.getItemId(), sa.getDescription(),
                     "Pack of " + sa.getPackSize(), sa.getPackSize(),
                     sa.getUnitCost(), 0.0, 0, 0), qty);
             orderTotal += sa.getUnitCost() * qty;
@@ -499,7 +544,7 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
             return;
         }
 
-        // Notify SA system
+        // Notify SA
         JSONArray itemsJson = new JSONArray();
         for (Map.Entry<SACatalogueItem, Integer> e : saCart.entrySet())
             itemsJson.put(new JSONObject().put("itemId", e.getKey().getItemId()).put("quantity", e.getValue()));
@@ -507,7 +552,6 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
                 new JSONObject().put("items", itemsJson).toString());
         if (saOrderId != null) RestockOrderDB.updateSAOrderId(orderNumber, saOrderId);
 
-        SACatalogueService.addToBalance(orderTotal);
         saCart.clear();
         refreshSACart();
 
@@ -526,10 +570,12 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         allProducts.addAll(ProductDB.getAllProducts());
         refreshTableView();
         int low = ProductDB.getLowStockCount();
-        if (warningLabel != null)
+        if (warningLabel != null) {
+            warningLabel.setForeground(low > 0 ? Color.ORANGE.darker() : ThemeManager.textPrimary());
             warningLabel.setText(low > 0
-                    ? "Warning: " + low + " product(s) are at or below minimum stock."
-                    : "All products are above minimum stock.");
+                    ? "  Warning: " + low + " product(s) are at or below minimum stock."
+                    : "  All products are above minimum stock.");
+        }
     }
 
     public void refreshTableView() {
