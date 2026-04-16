@@ -13,14 +13,14 @@ import java.awt.geom.RoundRectangle2D;
 
 public class LoginPanel extends JPanel {
 
-    private final Color PAGE_BG = new Color(243, 243, 243);
-    private final Color CARD_BG = new Color(248, 248, 248);
-    private final Color CARD_BORDER = new Color(215, 215, 215);
-    private final Color TEXT_DARK = new Color(63, 63, 63);
-    private final Color TEXT_MID = new Color(117, 117, 117);
-    private final Color FIELD_BORDER = new Color(205, 205, 205);
-    private final Color BUTTON_BG = new Color(79, 79, 79);
-    private final Color BUTTON_HOVER = new Color(65, 65, 65);
+    private final Color PAGE_BG = new Color(247, 247, 247);
+    private final Color CARD_BG = Color.WHITE;
+    private final Color CARD_BORDER = new Color(222, 222, 222);
+    private final Color TEXT_DARK = new Color(69, 69, 69);
+    private final Color TEXT_MID = new Color(122, 122, 122);
+    private final Color FIELD_BORDER = new Color(209, 209, 209);
+    private final Color BUTTON_BG = new Color(77, 77, 77);
+    private final Color BUTTON_HOVER = new Color(61, 61, 61);
     private final Color ERROR_RED = new Color(180, 50, 50);
 
     private PlaceholderTextField usernameField;
@@ -31,7 +31,7 @@ public class LoginPanel extends JPanel {
         setBackground(PAGE_BG);
         setLayout(new GridBagLayout());
 
-        RoundedPanel card = new RoundedPanel(32, CARD_BG, CARD_BORDER);
+        RoundedPanel card = new RoundedPanel(30, CARD_BG, CARD_BORDER);
         card.setOpaque(false);
         card.setPreferredSize(new Dimension(420, 640));
         card.setLayout(new GridBagLayout());
@@ -42,13 +42,13 @@ public class LoginPanel extends JPanel {
         c.fill = GridBagConstraints.HORIZONTAL;
 
         JLabel titleLabel = new JLabel("Sign in");
-        titleLabel.setFont(new Font("SansSerif", Font.BOLD, 24));
+        titleLabel.setFont(new Font("SansSerif", Font.BOLD, 32));
         titleLabel.setForeground(TEXT_DARK);
 
         JLabel subtitleLabel = new JLabel(
                 "<html>Log in by entering your Username and<br>Password.</html>"
         );
-        subtitleLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        subtitleLabel.setFont(new Font("SansSerif", Font.PLAIN, 15));
         subtitleLabel.setForeground(TEXT_MID);
 
         JLabel usernameLabel = new JLabel("Username");
@@ -60,34 +60,34 @@ public class LoginPanel extends JPanel {
         passwordLabel.setForeground(TEXT_MID);
 
         usernameField = new PlaceholderTextField("Username", 20);
-        usernameField.setFont(new Font("SansSerif", Font.BOLD, 16));
+        usernameField.setFont(new Font("SansSerif", Font.BOLD, 15));
         usernameField.setForeground(TEXT_DARK);
         usernameField.setBorder(null);
         usernameField.setOpaque(false);
 
         passwordField = new JPasswordField(20);
-        passwordField.setFont(new Font("SansSerif", Font.BOLD, 16));
+        passwordField.setFont(new Font("SansSerif", Font.BOLD, 15));
         passwordField.setForeground(TEXT_DARK);
         passwordField.setBorder(null);
         passwordField.setOpaque(false);
         passwordField.setEchoChar('•');
 
-        JPanel usernameWrapper = createInputWrapper("👤", usernameField, null, new Dimension(310, 46));
-        JPanel passwordWrapper = createPasswordWrapper(passwordField, new Dimension(310, 46));
+        JPanel usernameWrapper = createInputWrapper("👤", usernameField, null, new Dimension(300, 46));
+        JPanel passwordWrapper = createPasswordWrapper(passwordField, new Dimension(300, 46));
 
         JLabel forgotPassword = new JLabel("<html><u>Forgot password?</u></html>");
         forgotPassword.setFont(new Font("SansSerif", Font.PLAIN, 13));
         forgotPassword.setForeground(TEXT_DARK);
         forgotPassword.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-        JButton loginButton = createPrimaryButton("Log in", new Dimension(0, 50), 8, new Font("SansSerif", Font.BOLD, 18));
+        JButton loginButton = createPrimaryButton("Log in", new Dimension(300, 50), 8, new Font("SansSerif", Font.BOLD, 17));
 
         msgLabel = new JLabel(" ");
         msgLabel.setFont(new Font("SansSerif", Font.PLAIN, 13));
         msgLabel.setForeground(ERROR_RED);
 
         c.gridy = 0;
-        c.insets = new Insets(55, 55, 12, 55);
+        c.insets = new Insets(60, 55, 12, 55);
         card.add(titleLabel, c);
 
         c.gridy++;
@@ -99,7 +99,7 @@ public class LoginPanel extends JPanel {
         card.add(usernameLabel, c);
 
         c.gridy++;
-        c.insets = new Insets(0, 55, 20, 55);
+        c.insets = new Insets(0, 55, 18, 55);
         card.add(usernameWrapper, c);
 
         c.gridy++;
@@ -107,11 +107,11 @@ public class LoginPanel extends JPanel {
         card.add(passwordLabel, c);
 
         c.gridy++;
-        c.insets = new Insets(0, 55, 8, 55);
+        c.insets = new Insets(0, 55, 10, 55);
         card.add(passwordWrapper, c);
 
         c.gridy++;
-        c.insets = new Insets(0, 55, 28, 55);
+        c.insets = new Insets(0, 55, 26, 55);
         card.add(forgotPassword, c);
 
         c.gridy++;
@@ -119,6 +119,8 @@ public class LoginPanel extends JPanel {
         card.add(loginButton, c);
 
         c.gridy++;
+        c.weighty = 1.0;
+        c.anchor = GridBagConstraints.NORTHWEST;
         c.insets = new Insets(12, 55, 0, 55);
         card.add(msgLabel, c);
 
@@ -658,7 +660,7 @@ public class LoginPanel extends JPanel {
     private JPanel createInputWrapper(String iconText, JTextField field, JButton trailingButton, Dimension size) {
         JPanel wrapper = new JPanel(new BorderLayout());
         wrapper.setBackground(Color.WHITE);
-        wrapper.setBorder(new RoundedLineBorder(FIELD_BORDER, 2, 10));
+        wrapper.setBorder(new RoundedLineBorder(FIELD_BORDER, 2, 8));
         wrapper.setPreferredSize(size);
         wrapper.setMaximumSize(size);
 

@@ -8,6 +8,7 @@ import integration.PUCachePull;
 import integration.ProductSyncScheduler;
 import integration.SASync;
 import ui.MainFrame;
+import ui.ThemeManager;
 
 import javax.swing.*;
 
@@ -42,6 +43,7 @@ public class Main {
         syncScheduler.start();
         
         SwingUtilities.invokeLater(() -> {
+            ThemeManager.applyGlobalTheme();
             MainFrame frame = new MainFrame();
             frame.setVisible(true);
         });

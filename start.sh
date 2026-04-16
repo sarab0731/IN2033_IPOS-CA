@@ -39,10 +39,9 @@ echo "  VNC direct   → localhost:5900 (no password)"
 echo "  API server   → http://localhost:8082"
 echo "============================================"
 
-# Launch the application (classpath includes all Maven dependencies)
+# Launch the shaded application jar.
 exec java \
   -Djava.awt.headless=false \
   -Dawt.useSystemAAFontSettings=on \
   -Dswing.defaultlaf=javax.swing.plaf.metal.MetalLookAndFeel \
-  -cp "app.jar:dependency/*" \
-  app.Main
+  -jar app.jar

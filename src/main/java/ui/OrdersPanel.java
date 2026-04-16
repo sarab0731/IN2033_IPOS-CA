@@ -43,6 +43,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
     private JPanel leftCard;
     private JPanel rightCard;
     private JPanel bottomBar;
+    private JPanel merchantStatusCard;
     private JTable catalogueTable;
     private JTable summaryTable;
     private JScrollPane catalogueScrollPane;
@@ -69,6 +70,9 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
     private JLabel activeOrdersValue;
     private JLabel outstandingValue;
     private JLabel accountStatusLabel;
+    private JLabel activeOrdersLabel;
+    private JLabel outstandingLabel;
+    private JButton backToStockBtn;
 
     private final Map<SACatalogueItem, Integer> cart = new LinkedHashMap<>();
     private List<SACatalogueItem> currentCatalogue = new ArrayList<>();
@@ -99,7 +103,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         // Back button row (fix 5: back to Local Stock)
         JPanel backRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         backRow.setOpaque(false);
-        JButton backToStockBtn = createBtn("← Local Stock", false);
+        backToStockBtn = createBtn("← Local Stock", false);
         backToStockBtn.addActionListener(e -> router.goTo(MainFrame.SCREEN_STOCK));
         backRow.add(backToStockBtn);
 
@@ -146,7 +150,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         searchField = new JTextField("Search catalogue...");
         searchField.setPreferredSize(new Dimension(200, 36));
         searchField.setFont(new Font("SansSerif", Font.PLAIN, 13));
-        searchField.setForeground(Color.GRAY);
+        searchField.setForeground(ThemeManager.textSecondary());
         leftButtons.add(addToOrderBtn);
         leftButtons.add(removeItemBtn);
         leftButtons.add(searchField);
@@ -414,7 +418,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
             }
             @Override public void focusLost(java.awt.event.FocusEvent e) {
                 if (searchField.getText().trim().isEmpty()) {
-                    searchField.setText("Search catalogue..."); searchField.setForeground(Color.GRAY);
+                    searchField.setText("Search catalogue..."); searchField.setForeground(ThemeManager.textSecondary());
                 }
             }
         });
@@ -715,9 +719,9 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
     }
 
     private JPanel buildMerchantStatusCard() {
-        JPanel card = AppShell.createCard();
-        card.setLayout(new FlowLayout(FlowLayout.LEFT, 14, 6));
-        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56));
+        merchantStatusCard = AppShell.createCard();
+        merchantStatusCard.setLayout(new FlowLayout(FlowLayout.LEFT, 14, 6));
+        merchantStatusCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56));
 
         merchantStatusLabel = new JLabel("Account Status:");
         merchantStatusLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
@@ -726,17 +730,17 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         accountStatusLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
         accountStatusLabel.setForeground(new Color(34, 139, 34));
 
-        JLabel activeLabel = new JLabel("  Active Orders:");
+        activeOrdersLabel = new JLabel("  Active Orders:");
         activeOrdersValue  = new JLabel("—");
-        JLabel outLabel    = new JLabel("  Balance:");
+        outstandingLabel   = new JLabel("  Balance:");
         outstandingValue   = new JLabel("—");
 
-        card.add(merchantStatusLabel); card.add(accountStatusLabel);
-        card.add(activeLabel); card.add(activeOrdersValue);
-        card.add(outLabel); card.add(outstandingValue);
+        merchantStatusCard.add(merchantStatusLabel); merchantStatusCard.add(accountStatusLabel);
+        merchantStatusCard.add(activeOrdersLabel); merchantStatusCard.add(activeOrdersValue);
+        merchantStatusCard.add(outstandingLabel); merchantStatusCard.add(outstandingValue);
 
         refreshMerchantStatus();
-        return card;
+        return merchantStatusCard;
     }
 
     private void refreshMerchantStatus() {
@@ -851,6 +855,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         JButton btn = new JButton(text);
         btn.setFocusPainted(false); btn.setFont(new Font("SansSerif", Font.BOLD, 13));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setOpaque(true);
         btn.setBorder(BorderFactory.createEmptyBorder(10, 16, 10, 16));
         if (primary) { btn.setBackground(ThemeManager.buttonDark()); btn.setForeground(ThemeManager.textLight()); }
         else { btn.setBackground(ThemeManager.buttonLight()); btn.setForeground(ThemeManager.textPrimary());
@@ -894,16 +899,83 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         if (topTabBar     != null) topTabBar.setBackground(ThemeManager.appBackground());
         if (controlsPanel != null) controlsPanel.setBackground(ThemeManager.appBackground());
         if (bottomBar     != null) bottomBar.setBackground(ThemeManager.appBackground());
+        if (merchantStatusCard != null) merchantStatusCard.setBackground(ThemeManager.panelBackground());
         if (leftCard      != null) leftCard.setBackground(ThemeManager.panelBackground());
         if (rightCard     != null) rightCard.setBackground(ThemeManager.panelBackground());
         if (availableProductsLabel != null) availableProductsLabel.setForeground(ThemeManager.textPrimary());
         if (orderSummaryLabel      != null) orderSummaryLabel.setForeground(ThemeManager.textPrimary());
         if (merchantIdLabel        != null) merchantIdLabel.setForeground(ThemeManager.textPrimary());
+        if (merchantIdValue        != null) {
+            merchantIdValue.setForeground(ThemeManager.textPrimary());
+            merchantIdValue.setBackground(ThemeManager.fieldBackground());
+            merchantIdValue.setOpaque(true);
+            merchantIdValue.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(ThemeManager.borderColor()),
+                    new EmptyBorder(6, 12, 6, 12)
+            ));
+        }
+        if (merchantStatusLabel    != null) merchantStatusLabel.setForeground(ThemeManager.textPrimary());
+        if (activeOrdersLabel      != null) activeOrdersLabel.setForeground(ThemeManager.textPrimary());
+        if (activeOrdersValue      != null) activeOrdersValue.setForeground(ThemeManager.textPrimary());
+        if (outstandingLabel       != null) outstandingLabel.setForeground(ThemeManager.textPrimary());
+        if (outstandingValue       != null) outstandingValue.setForeground(ThemeManager.textPrimary());
         if (totalLabel             != null) totalLabel.setForeground(ThemeManager.textPrimary());
         if (catalogueTable  != null) applyTableTheme(catalogueTable);
         if (summaryTable    != null) applyTableTheme(summaryTable);
         if (catalogueScrollPane != null) styleScrollPane(catalogueScrollPane);
         if (summaryScrollPane   != null) styleScrollPane(summaryScrollPane);
+        if (backToStockBtn != null) {
+            backToStockBtn.setBackground(ThemeManager.buttonLight());
+            backToStockBtn.setForeground(ThemeManager.textPrimary());
+            backToStockBtn.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(ThemeManager.borderColor()),
+                    new EmptyBorder(10, 16, 10, 16)
+            ));
+        }
+        if (addToOrderBtn != null) {
+            addToOrderBtn.setBackground(ThemeManager.buttonDark());
+            addToOrderBtn.setForeground(ThemeManager.textLight());
+            addToOrderBtn.setBorder(new EmptyBorder(10, 16, 10, 16));
+        }
+        if (removeItemBtn != null) {
+            removeItemBtn.setBackground(ThemeManager.buttonLight());
+            removeItemBtn.setForeground(ThemeManager.textPrimary());
+            removeItemBtn.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(ThemeManager.borderColor()),
+                    new EmptyBorder(10, 16, 10, 16)
+            ));
+        }
+        if (clearOrderBtn != null) {
+            clearOrderBtn.setBackground(ThemeManager.buttonLight());
+            clearOrderBtn.setForeground(ThemeManager.textPrimary());
+            clearOrderBtn.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(ThemeManager.borderColor()),
+                    new EmptyBorder(10, 16, 10, 16)
+            ));
+        }
+        if (placeOrderBtn != null) {
+            placeOrderBtn.setBackground(ThemeManager.buttonDark());
+            placeOrderBtn.setForeground(ThemeManager.textLight());
+            placeOrderBtn.setBorder(new EmptyBorder(10, 16, 10, 16));
+        }
+        if (placeNewOrderTab != null) placeNewOrderTab.setFont(new Font("SansSerif", Font.BOLD, 13));
+        if (orderHistoryTab != null) orderHistoryTab.setFont(new Font("SansSerif", Font.BOLD, 13));
+        if (searchField != null) {
+            ThemeManager.styleTextField(searchField);
+            boolean placeholder = "Search catalogue...".equals(searchField.getText());
+            searchField.setForeground(placeholder ? ThemeManager.textSecondary() : ThemeManager.fieldForeground());
+        }
+        switchOrderView(CARD_HISTORY.equals(getVisibleOrderCard()) ? CARD_HISTORY : CARD_NEW_ORDER);
         repaint(); revalidate();
+    }
+
+    private String getVisibleOrderCard() {
+        if (orderCards == null) return CARD_NEW_ORDER;
+        for (Component component : orderCards.getComponents()) {
+            if (component.isVisible()) {
+                return component == orderCards.getComponent(1) ? CARD_HISTORY : CARD_NEW_ORDER;
+            }
+        }
+        return CARD_NEW_ORDER;
     }
 }

@@ -32,6 +32,7 @@ public class PUOrdersPanel extends JPanel implements ThemeManager.ThemeListener 
 
     private JLabel titleLabel;
     private JLabel statusNote;
+    private JLabel filterLabel;
 
     private List<PUOrder> currentOrders;
 
@@ -74,7 +75,8 @@ public class PUOrdersPanel extends JPanel implements ThemeManager.ThemeListener 
         statusFilter.setPreferredSize(new Dimension(190, 36));
 
         refreshBtn = createBtn("Refresh", false);
-        rightHeader.add(new JLabel("Filter:"));
+        filterLabel = new JLabel("Filter:");
+        rightHeader.add(filterLabel);
         rightHeader.add(statusFilter);
         rightHeader.add(refreshBtn);
 
@@ -340,8 +342,10 @@ public class PUOrdersPanel extends JPanel implements ThemeManager.ThemeListener 
         if (tableCard     != null) tableCard.setBackground(ThemeManager.panelBackground());
         if (titleLabel    != null) titleLabel.setForeground(ThemeManager.textPrimary());
         if (statusNote    != null) statusNote.setForeground(ThemeManager.textSecondary());
+        if (filterLabel   != null) filterLabel.setForeground(ThemeManager.textPrimary());
         if (table         != null) applyTableTheme(table);
         if (scrollPane    != null) styleScrollPane(scrollPane);
+        if (statusFilter  != null) ThemeManager.styleComboBox(statusFilter);
         if (refreshBtn    != null) {
             refreshBtn.setBackground(ThemeManager.buttonLight());
             refreshBtn.setForeground(ThemeManager.textPrimary());
