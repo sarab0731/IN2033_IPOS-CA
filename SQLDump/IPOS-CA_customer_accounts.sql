@@ -26,7 +26,6 @@ DROP TABLE IF EXISTS `customer_accounts`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `customer_accounts` (
   `customer_id` int NOT NULL AUTO_INCREMENT,
-  `account_number` varchar(100) NOT NULL,
   `full_name` varchar(255) NOT NULL,
   `email` varchar(255) DEFAULT NULL,
   `phone` varchar(50) DEFAULT NULL,
@@ -34,10 +33,10 @@ CREATE TABLE `customer_accounts` (
   `credit_limit` decimal(10,2) NOT NULL DEFAULT '0.00',
   `current_balance` decimal(10,2) NOT NULL DEFAULT '0.00',
   `account_status` varchar(20) NOT NULL DEFAULT 'ACTIVE',
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
   `discount_plan_id` int DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`customer_id`),
-  UNIQUE KEY `account_number` (`account_number`),
   KEY `discount_plan_id` (`discount_plan_id`),
   CONSTRAINT `customer_accounts_ibfk_1` FOREIGN KEY (`discount_plan_id`) REFERENCES `discount_plans` (`discount_plan_id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `customer_accounts_chk_1` CHECK ((`credit_limit` >= 0)),

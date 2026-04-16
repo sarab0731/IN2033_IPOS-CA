@@ -367,7 +367,10 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         saPlaceOrderBtn.addActionListener(e -> placeSAOrder());
 
         addComponentListener(new java.awt.event.ComponentAdapter() {
-            @Override public void componentShown(java.awt.event.ComponentEvent e) { loadTable(); }
+            @Override public void componentShown(java.awt.event.ComponentEvent e) {
+                switchTab(CARD_LOCAL);
+                loadTable();
+            }
         });
     }
 

@@ -96,6 +96,13 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         contentPanel.setBorder(new EmptyBorder(8, 8, 8, 8));
         contentPanel.setOpaque(true);
 
+        // Back button row (fix 5: back to Local Stock)
+        JPanel backRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        backRow.setOpaque(false);
+        JButton backToStockBtn = createBtn("← Local Stock", false);
+        backToStockBtn.addActionListener(e -> router.goTo(MainFrame.SCREEN_STOCK));
+        backRow.add(backToStockBtn);
+
         // Tab bar
         topTabBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 18, 0));
         topTabBar.setOpaque(false);
@@ -109,6 +116,8 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         JPanel northStack = new JPanel();
         northStack.setLayout(new BoxLayout(northStack, BoxLayout.Y_AXIS));
         northStack.setOpaque(false);
+        northStack.add(backRow);
+        northStack.add(Box.createVerticalStrut(4));
         northStack.add(topTabBar);
         northStack.add(Box.createVerticalStrut(8));
         northStack.add(merchantCard);
@@ -221,7 +230,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
     /** The "Order History" card — inline table with action buttons, no modal needed. */
     private JPanel buildHistoryCard() {
         historyModel = new DefaultTableModel(
-                new String[]{"ID", "Order Number", "Merchant ID", "Status", "Total £", "SA Order ID", "Created At"}, 0
+                new String[]{"ID", "Order Number", "Status", "Total £", "SA Order ID", "Created At"}, 0
         ) { @Override public boolean isCellEditable(int r, int c) { return false; } };
         historyTable = new JTable(historyModel);
         configureTable(historyTable);
@@ -261,8 +270,8 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
                     tracking.isEmpty() ? "No tracking information available from SA." : tracking,
                     "Delivery Tracking — " + saOrderId, JOptionPane.INFORMATION_MESSAGE);
             if (!tracking.isEmpty()) {
-                String saStatus   = parseSAStatus(tracking);
-                String localStatus = String.valueOf(historyModel.getValueAt(mRow, 3));
+                String saStatus    = parseSAStatus(tracking);
+                String localStatus = String.valueOf(historyModel.getValueAt(mRow, 2));
                 String mappedStatus = mapSAStatusToCA(saStatus);
                 if (mappedStatus != null && isStatusProgression(localStatus, mappedStatus)) {
                     int sync = JOptionPane.showConfirmDialog(this,
@@ -271,17 +280,24 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
                             + "\n\nUpdate local order to " + mappedStatus + "?",
                             "Sync Status from SA", JOptionPane.YES_NO_OPTION);
                     if (sync == JOptionPane.YES_OPTION) {
-                        RestockOrderDB.updateStatus(selectedOrderId, localStatus, mappedStatus);
+                        boolean ok = RestockOrderDB.updateStatus(selectedOrderId, localStatus, mappedStatus);
                         if ("DELIVERED".equals(mappedStatus)) {
-                            List<RestockOrderItem> delivered = RestockOrderDB.getOrderItems(selectedOrderId);
-                            for (RestockOrderItem item : delivered)
-                                SASync.deductSAStock(item.getItemId(), item.getQuantity());
-                            refreshMerchantStatus();
+                            if (ok) {
+                                refreshMerchantStatus();
+                                JOptionPane.showMessageDialog(this,
+                                        "Delivery recorded. Local stock has been updated.",
+                                        "Stock Updated", JOptionPane.INFORMATION_MESSAGE);
+                            } else {
+                                JOptionPane.showMessageDialog(this,
+                                        "Status updated to DELIVERED but stock update failed.\n"
+                                        + "Check application logs for details.",
+                                        "Stock Update Failed", JOptionPane.ERROR_MESSAGE);
+                            }
                         }
-                        loadOrderHistory(historyModel);
                     }
                 }
             }
+            loadOrderHistory(historyModel);
         });
 
         printBtn.addActionListener(e -> {
@@ -315,10 +331,10 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
             }
             showOrderInvoiceDialog(SwingUtilities.getWindowAncestor(this),
                     String.valueOf(historyModel.getValueAt(mRow, 1)),
+                    Session.getMerchantId(),
                     String.valueOf(historyModel.getValueAt(mRow, 2)),
                     String.valueOf(historyModel.getValueAt(mRow, 3)),
-                    String.valueOf(historyModel.getValueAt(mRow, 4)),
-                    String.valueOf(historyModel.getValueAt(mRow, 6)));
+                    String.valueOf(historyModel.getValueAt(mRow, 5)));
         });
 
         statusBtn.addActionListener(e -> {
@@ -326,7 +342,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
             if (row == -1) { JOptionPane.showMessageDialog(this, "Select an order."); return; }
             int mRow   = historyTable.convertRowIndexToModel(row);
             int orderId = (int) historyModel.getValueAt(mRow, 0);
-            String cur  = String.valueOf(historyModel.getValueAt(mRow, 3));
+            String cur  = String.valueOf(historyModel.getValueAt(mRow, 2));
             String next = getNextStatus(cur);
             if (next == null) { JOptionPane.showMessageDialog(this, "Order already delivered."); return; }
 
@@ -334,14 +350,19 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
                     "Update: " + cur + " → " + next + "?", "Confirm", JOptionPane.YES_NO_OPTION);
             if (confirm != JOptionPane.YES_OPTION) return;
 
-            RestockOrderDB.updateStatus(orderId, cur, next);
+            boolean ok = RestockOrderDB.updateStatus(orderId, cur, next);
             if ("DELIVERED".equals(next)) {
-                List<RestockOrderItem> delivered = RestockOrderDB.getOrderItems(orderId);
-                for (RestockOrderItem item : delivered)
-                    SASync.deductSAStock(item.getItemId(), item.getQuantity());
-                refreshMerchantStatus();
-                JOptionPane.showMessageDialog(this,
-                        "Delivery recorded. Stock updated for " + delivered.size() + " product(s).");
+                if (ok) {
+                    refreshMerchantStatus();
+                    JOptionPane.showMessageDialog(this,
+                            "Delivery recorded. Local stock has been updated.",
+                            "Stock Updated", JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(this,
+                            "Status updated to DELIVERED but stock update failed.\n"
+                            + "Check application logs for details.",
+                            "Stock Update Failed", JOptionPane.ERROR_MESSAGE);
+                }
             }
             loadOrderHistory(historyModel);
         });
@@ -596,15 +617,68 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
     }
 
     private void loadOrderHistory(DefaultTableModel model) {
+        // First populate the table with current local state
         model.setRowCount(0);
         for (RestockOrder o : RestockOrderDB.getAllOrders()) {
             model.addRow(new Object[]{
-                    o.getRestockOrderId(), o.getOrderNumber(), o.getMerchantId(),
+                    o.getRestockOrderId(), o.getOrderNumber(),
                     o.getStatus(), String.format("%.2f", o.getTotalValue()),
                     RestockOrderDB.getSAOrderId(o.getRestockOrderId()),
                     o.getCreatedAt()
             });
         }
+
+        // Auto-sync SA statuses in background for all non-DELIVERED orders with an SA order ID
+        new javax.swing.SwingWorker<Boolean, Void>() {
+            @Override
+            protected Boolean doInBackground() {
+                boolean anyUpdated = false;
+                List<RestockOrder> openOrders = RestockOrderDB.getAllOrders();
+                for (RestockOrder o : openOrders) {
+                    if ("DELIVERED".equals(o.getStatus())) continue;
+                    String saId = RestockOrderDB.getSAOrderId(o.getRestockOrderId());
+                    if (saId == null || saId.isEmpty()) continue;
+                    try {
+                        String tracking = SAApiClient.trackDelivery(saId);
+                        if (tracking == null || tracking.isEmpty()) continue;
+                        String saStatus     = parseSAStatus(tracking);
+                        String mappedStatus = mapSAStatusToCA(saStatus);
+                        if (mappedStatus != null && isStatusProgression(o.getStatus(), mappedStatus)) {
+                            System.out.println("[OrdersPanel] Auto-syncing order " + o.getOrderNumber()
+                                    + ": " + o.getStatus() + " → " + mappedStatus);
+                            RestockOrderDB.updateStatus(o.getRestockOrderId(), o.getStatus(), mappedStatus);
+                            anyUpdated = true;
+                        }
+                    } catch (Exception ex) {
+                        System.err.println("[OrdersPanel] Auto-sync failed for order "
+                                + o.getOrderNumber() + ": " + ex.getMessage());
+                    }
+                }
+                return anyUpdated;
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    boolean anyUpdated = get();
+                    if (anyUpdated) {
+                        // Reload table with fresh statuses
+                        model.setRowCount(0);
+                        for (RestockOrder o : RestockOrderDB.getAllOrders()) {
+                            model.addRow(new Object[]{
+                                    o.getRestockOrderId(), o.getOrderNumber(),
+                                    o.getStatus(), String.format("%.2f", o.getTotalValue()),
+                                    RestockOrderDB.getSAOrderId(o.getRestockOrderId()),
+                                    o.getCreatedAt()
+                            });
+                        }
+                        refreshMerchantStatus();
+                    }
+                } catch (Exception ex) {
+                    System.err.println("[OrdersPanel] Auto-sync worker error: " + ex.getMessage());
+                }
+            }
+        }.execute();
     }
 
     private void showOrderItemsDialog(java.awt.Window parent, int orderId) {
@@ -645,7 +719,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         card.setLayout(new FlowLayout(FlowLayout.LEFT, 14, 6));
         card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56));
 
-        merchantStatusLabel = new JLabel("InfoPharma SA:");
+        merchantStatusLabel = new JLabel("Account Status:");
         merchantStatusLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
 
         accountStatusLabel = new JLabel("NORMAL");
@@ -657,15 +731,9 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         JLabel outLabel    = new JLabel("  Balance:");
         outstandingValue   = new JLabel("—");
 
-        JButton detailsBtn = createBtn("Account Details", false);
-        JButton settleBtn  = createBtn("Record SA Payment", false);
-        detailsBtn.addActionListener(e -> showAccountBalanceDialog());
-        settleBtn.addActionListener(e  -> showSettleAccountDialog());
-
         card.add(merchantStatusLabel); card.add(accountStatusLabel);
         card.add(activeLabel); card.add(activeOrdersValue);
         card.add(outLabel); card.add(outstandingValue);
-        card.add(detailsBtn); card.add(settleBtn);
 
         refreshMerchantStatus();
         return card;

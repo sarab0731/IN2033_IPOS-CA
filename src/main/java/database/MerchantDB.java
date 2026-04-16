@@ -151,8 +151,8 @@ public class MerchantDB {
     public static int ensureProduct(SACatalogueItem item) {
         String checkSql  = "SELECT product_id FROM products WHERE item_id = ?";
         String insertSql = "INSERT INTO products " +
-                           "(item_id, description, package_type, units_in_pack, price, vat_rate, stock_quantity, min_stock_level) " +
-                           "VALUES (?, ?, ?, ?, ?, 0.0, 0, 0)";
+                           "(item_id, description, package_type, units_in_pack, price, vat_rate, stock_quantity, min_stock_level, is_active) " +
+                           "VALUES (?, ?, ?, ?, ?, 0.0, 0, 0, 1)";
         try (Connection conn = DatabaseManager.getConnection()) {
             try (PreparedStatement check = conn.prepareStatement(checkSql)) {
                 check.setString(1, item.getItemId());

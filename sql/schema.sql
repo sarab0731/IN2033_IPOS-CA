@@ -30,7 +30,6 @@ CREATE TABLE IF NOT EXISTS discount_plans (
 -- ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS customer_accounts (
                                                  customer_id INT AUTO_INCREMENT PRIMARY KEY,
-                                                 account_number VARCHAR(100) NOT NULL UNIQUE,
     full_name VARCHAR(255) NOT NULL,
     email VARCHAR(255),
     phone VARCHAR(50),
@@ -326,13 +325,5 @@ CREATE TABLE IF NOT EXISTS merchants (
     CHECK (sa_account_status IN ('NORMAL', 'SUSPENDED', 'IN_DEFAULT'))
 );
 
--- Migrations: add columns that may be missing from older schema versions
-ALTER TABLE merchants ADD COLUMN IF NOT EXISTS sa_account_status   VARCHAR(20) NOT NULL DEFAULT 'NORMAL';
-ALTER TABLE merchants ADD COLUMN IF NOT EXISTS company_name        VARCHAR(255) NOT NULL DEFAULT '';
-ALTER TABLE merchants ADD COLUMN IF NOT EXISTS registration_number VARCHAR(100);
-ALTER TABLE merchants ADD COLUMN IF NOT EXISTS email               VARCHAR(255);
-ALTER TABLE merchants ADD COLUMN IF NOT EXISTS phone               VARCHAR(20);
-ALTER TABLE merchants ADD COLUMN IF NOT EXISTS address             TEXT;
-ALTER TABLE restock_orders ADD COLUMN IF NOT EXISTS sa_order_id   VARCHAR(100) NULL;
 
 

@@ -139,6 +139,7 @@ public class LoginPanel extends JPanel {
                 Session.login(user);
                 msgLabel.setText(" ");
                 router.goTo(MainFrame.SCREEN_DASHBOARD);
+
             } else {
                 msgLabel.setText("Invalid username or password.");
                 passwordField.setText("");

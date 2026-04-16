@@ -143,22 +143,40 @@ public class RestockOrderDB {
     }
 
     /**
-     * When an order is delivered, add the ordered quantities back into product stock.
+     * When an order is delivered, add the ordered quantities to each product's local stock.
+     * Throws if no items are found for the order (indicates a data integrity issue).
      */
     private static void receiveStock(Connection conn, int restockOrderId) throws SQLException {
-        String itemsSql = "SELECT product_id, quantity FROM restock_order_items WHERE restock_order_id = ?";
+        String itemsSql = "SELECT roi.product_id, roi.quantity, p.item_id " +
+                          "FROM restock_order_items roi " +
+                          "JOIN products p ON roi.product_id = p.product_id " +
+                          "WHERE roi.restock_order_id = ?";
         String stockSql = "UPDATE products SET stock_quantity = stock_quantity + ? WHERE product_id = ?";
 
-        PreparedStatement itemsStmt = conn.prepareStatement(itemsSql);
-        itemsStmt.setInt(1, restockOrderId);
-        ResultSet rs = itemsStmt.executeQuery();
-
-        PreparedStatement stockStmt = conn.prepareStatement(stockSql);
-        while (rs.next()) {
-            stockStmt.setInt(1, rs.getInt("quantity"));
-            stockStmt.setInt(2, rs.getInt("product_id"));
-            stockStmt.executeUpdate();
+        int itemCount = 0;
+        try (PreparedStatement itemsStmt = conn.prepareStatement(itemsSql)) {
+            itemsStmt.setInt(1, restockOrderId);
+            try (ResultSet rs = itemsStmt.executeQuery();
+                 PreparedStatement stockStmt = conn.prepareStatement(stockSql)) {
+                while (rs.next()) {
+                    int productId = rs.getInt("product_id");
+                    int quantity  = rs.getInt("quantity");
+                    String itemId = rs.getString("item_id");
+                    stockStmt.setInt(1, quantity);
+                    stockStmt.setInt(2, productId);
+                    stockStmt.executeUpdate();
+                    System.out.println("[RestockOrderDB] receiveStock: +" + quantity
+                            + " units for product " + itemId + " (id=" + productId + ")");
+                    itemCount++;
+                }
+            }
         }
+
+        if (itemCount == 0) {
+            throw new SQLException("No items found for restock order " + restockOrderId
+                    + " — stock not updated. Check restock_order_items table.");
+        }
+        System.out.println("[RestockOrderDB] receiveStock: updated stock for " + itemCount + " product(s).");
     }
 
     /**

@@ -375,7 +375,7 @@ public class DashboardPanel extends JPanel implements ThemeManager.ThemeListener
     }
 
     private void buildOrderStatusCard() {
-        orderStatusTitleLabel = new JLabel("Order Status");
+        orderStatusTitleLabel = new JLabel("Restock Orders");
         orderStatusTitleLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
 
         String[] columns = {"Order Number", "Merchant", "Status", "Total £", "Created At"};

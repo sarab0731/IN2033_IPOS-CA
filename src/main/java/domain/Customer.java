@@ -3,7 +3,6 @@ package domain;
 public class Customer {
 
     private int customerId;
-    private String accountNumber;
     private String fullName;
     private String email;
     private String phone;
@@ -13,11 +12,10 @@ public class Customer {
     private String accountStatus;
     private int discountPlanId;
 
-    public Customer(int customerId, String accountNumber, String fullName, String email,
+    public Customer(int customerId, String fullName, String email,
                     String phone, String address, double creditLimit,
                     double currentBalance, String accountStatus, int discountPlanId) {
         this.customerId    = customerId;
-        this.accountNumber = accountNumber;
         this.fullName      = fullName;
         this.email         = email;
         this.phone         = phone;
@@ -29,7 +27,6 @@ public class Customer {
     }
 
     public int    getCustomerId()     { return customerId; }
-    public String getAccountNumber()  { return accountNumber; }
     public String getFullName()       { return fullName; }
     public String getEmail()          { return email; }
     public String getPhone()          { return phone; }
@@ -49,6 +46,6 @@ public class Customer {
 
     @Override
     public String toString() {
-        return accountNumber + " - " + fullName;
+        return fullName;
     }
 }

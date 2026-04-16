@@ -189,7 +189,7 @@ public class PdfGenerator {
             doc.add(para("INVOICE NO.: " + invoiceNumber, bold, 13)
                     .setTextAlignment(TextAlignment.CENTER));
             doc.add(spacer(8));
-            doc.add(para("Account No: " + customer.getAccountNumber(), regular, 11));
+            doc.add(para("Customer ID: " + customer.getCustomerId(), regular, 11));
             doc.add(spacer(12));
 
             // Items table

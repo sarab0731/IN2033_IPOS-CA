@@ -10,19 +10,30 @@ public class ProductDB {
 
     public static List<Product> getAllProducts() {
         List<Product> list = new ArrayList<>();
-        String sql = "SELECT * FROM products WHERE is_active = 1 ORDER BY item_id";
+        String activeSql   = "SELECT * FROM products WHERE is_active = 1 ORDER BY item_id";
+        String fallbackSql = "SELECT * FROM products ORDER BY item_id";
 
-        try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
-
-            while (rs.next()) {
-                list.add(mapRow(rs));
+        try (Connection conn = DatabaseManager.getConnection()) {
+            try (PreparedStatement stmt = conn.prepareStatement(activeSql);
+                 ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) list.add(mapRow(rs));
+            } catch (SQLException ex) {
+                // Backward compat: older schema may not have is_active column
+                if ("42S22".equals(ex.getSQLState())) {
+                    System.err.println("[ProductDB] is_active column missing — falling back to full scan");
+                    try (PreparedStatement stmt = conn.prepareStatement(fallbackSql);
+                         ResultSet rs = stmt.executeQuery()) {
+                        while (rs.next()) list.add(mapRow(rs));
+                    }
+                } else {
+                    throw ex;
+                }
             }
-
         } catch (Exception e) {
+            System.err.println("[ProductDB] getAllProducts failed: " + e.getMessage());
             e.printStackTrace();
         }
+        System.out.println("[ProductDB] getAllProducts: " + list.size() + " products loaded");
         return list;
     }
 
@@ -47,8 +58,8 @@ public class ProductDB {
     public static boolean addProduct(Product p) {
         String sql = """
             INSERT INTO products (item_id, description, package_type, units_in_pack,
-                                  price, vat_rate, stock_quantity, min_stock_level)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                  price, vat_rate, stock_quantity, min_stock_level, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
             """;
 
         try (Connection conn = DatabaseManager.getConnection();

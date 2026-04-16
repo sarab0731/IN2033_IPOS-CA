@@ -247,14 +247,14 @@ public class ReportsPanel extends JPanel implements ThemeManager.ThemeListener {
     }
 
     private void generateDebtReport() throws Exception {
-        tableModel.setColumnIdentifiers(new String[]{"Customer", "Account No.", "Balance £", "Status"});
+        tableModel.setColumnIdentifiers(new String[]{"Customer", "Customer ID", "Balance £", "Status"});
         tableModel.setRowCount(0);
 
         for (Customer c : CustomerDB.getAllActiveCustomers()) {
             if (c.getCurrentBalance() > 0) {
                 tableModel.addRow(new Object[]{
                         c.getFullName(),
-                        c.getAccountNumber(),
+                        c.getCustomerId(),
                         String.format("%.2f", c.getCurrentBalance()),
                         c.getAccountStatus()
                 });

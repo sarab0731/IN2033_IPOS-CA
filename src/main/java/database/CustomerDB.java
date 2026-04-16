@@ -39,44 +39,26 @@ public class CustomerDB {
         return list;
     }
 
-    public static Customer getByAccountNumber(String accountNumber) {
-        String sql = "SELECT * FROM customer_accounts WHERE account_number = ?";
-
-        try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setString(1, accountNumber);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                return mapRow(rs);
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
 
     public static boolean addCustomer(Customer c) {
         String sql = """
             INSERT INTO customer_accounts
-                (account_number, full_name, email, phone, address, credit_limit, discount_plan_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (full_name, email, phone, address, credit_limit, discount_plan_id)
+            VALUES (?, ?, ?, ?, ?, ?)
             """;
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setString(1, c.getAccountNumber());
-            stmt.setString(2, c.getFullName());
-            stmt.setString(3, c.getEmail());
-            stmt.setString(4, c.getPhone());
-            stmt.setString(5, c.getAddress());
-            stmt.setDouble(6, c.getCreditLimit());
+            stmt.setString(1, c.getFullName());
+            stmt.setString(2, c.getEmail());
+            stmt.setString(3, c.getPhone());
+            stmt.setString(4, c.getAddress());
+            stmt.setDouble(5, c.getCreditLimit());
             if (c.getDiscountPlanId() > 0) {
-                stmt.setInt(7, c.getDiscountPlanId());
+                stmt.setInt(6, c.getDiscountPlanId());
             } else {
-                stmt.setNull(7, Types.INTEGER);
+                stmt.setNull(6, Types.INTEGER);
             }
 
             stmt.executeUpdate();
@@ -222,7 +204,6 @@ public class CustomerDB {
     private static Customer mapRow(ResultSet rs) throws SQLException {
         return new Customer(
                 rs.getInt("customer_id"),
-                rs.getString("account_number"),
                 rs.getString("full_name"),
                 rs.getString("email"),
                 rs.getString("phone"),

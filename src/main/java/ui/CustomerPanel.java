@@ -98,7 +98,7 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
         tableCard.setBorder(new EmptyBorder(18, 18, 18, 18));
 
         tableModel = new DefaultTableModel(
-                new String[]{"Customer ID", "Name", "Discount Plan", "Credit Limit", "Monthly", "Status"}, 0
+                new String[]{"Customer ID", "Name", "Discount Plan", "Credit Limit", "Balance", "Status"}, 0
         ) {
             @Override
             public boolean isCellEditable(int row, int col) {
@@ -226,10 +226,8 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
 
         List<Customer> customers = CustomerDB.getAllActiveCustomers();
         customers.removeIf(c ->
-                (!keyword.isEmpty()
-                        && !c.getFullName().toLowerCase().contains(keyword)
-                        && !c.getAccountNumber().toLowerCase().contains(keyword))
-                        || (!"All Customers".equals(statusFilter) && !c.getAccountStatus().equals(statusFilter))
+                (!keyword.isEmpty() && !c.getFullName().toLowerCase().contains(keyword))
+                || (!"All Customers".equals(statusFilter) && !c.getAccountStatus().equals(statusFilter))
         );
 
         if ("Sort by: Balance".equals(sort)) {
@@ -249,7 +247,7 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
 
             tableModel.addRow(new Object[]{
                     c.getCustomerId(),
-                    c.getFullName() + " (" + c.getAccountNumber() + ")",
+                    c.getFullName(),
                     discountText,
                     String.format("£%.2f", c.getCreditLimit()),
                     String.format("£%.2f", c.getCurrentBalance()),
@@ -259,7 +257,6 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
     }
 
     private void showAddDialog() {
-        JTextField accNumField = new JTextField();
         JTextField nameField = new JTextField();
         JTextField emailField = new JTextField();
         JTextField phoneField = new JTextField();
@@ -288,7 +285,6 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
         });
 
         Object[] fields = {
-                "Account Number:", accNumField,
                 "Full Name:", nameField,
                 "Email:", emailField,
                 "Phone:", phoneField,
@@ -300,8 +296,8 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
         int result = JOptionPane.showConfirmDialog(this, fields, "Add Customer", JOptionPane.OK_CANCEL_OPTION);
         if (result != JOptionPane.OK_OPTION) return;
 
-        if (accNumField.getText().trim().isEmpty() || nameField.getText().trim().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Account number and name are required.");
+        if (nameField.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "A name is required.");
             return;
         }
 
@@ -311,7 +307,6 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
 
             Customer customer = new Customer(
                     0,
-                    accNumField.getText().trim(),
                     nameField.getText().trim(),
                     emailField.getText().trim(),
                     phoneField.getText().trim(),
@@ -326,10 +321,9 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
                 searchField.setText("");
                 filterCombo.setSelectedItem("All Customers");
                 loadTable();
-                focusCustomerRowByAccountNumber(customer.getAccountNumber());
                 JOptionPane.showMessageDialog(this, "Customer added successfully.");
             } else {
-                JOptionPane.showMessageDialog(this, "Failed to add customer. Account number may already exist.");
+                JOptionPane.showMessageDialog(this, "Failed to add customer");
             }
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(this, "Please enter a valid credit limit.");
@@ -487,10 +481,11 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
         Customer customer = CustomerDB.getById(customerId);
         if (customer == null) return;
 
-        JTextField nameField  = new JTextField(customer.getFullName());
-        JTextField emailField = new JTextField(customer.getEmail() != null ? customer.getEmail() : "");
-        JTextField phoneField = new JTextField(customer.getPhone() != null ? customer.getPhone() : "");
-        JTextField limitField = new JTextField(String.format("%.2f", customer.getCreditLimit()));
+        JTextField nameField    = new JTextField(customer.getFullName());
+        JTextField emailField   = new JTextField(customer.getEmail()    != null ? customer.getEmail()    : "");
+        JTextField phoneField   = new JTextField(customer.getPhone()    != null ? customer.getPhone()    : "");
+        JTextField addressField = new JTextField(customer.getAddress()  != null ? customer.getAddress()  : "");
+        JTextField limitField   = new JTextField(String.format("%.2f", customer.getCreditLimit()));
 
         List<DiscountPlan> plans = DiscountPlanDB.getAllPlans();
         JComboBox<DiscountPlan> planCombo = new JComboBox<>(plans.toArray(new DiscountPlan[0]));
@@ -507,6 +502,7 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
                 "Full Name:",      nameField,
                 "Email:",          emailField,
                 "Phone:",          phoneField,
+                "Address:",        addressField,
                 "Credit Limit £:", limitField,
                 "Discount Plan:",  planCombo
         };
@@ -520,11 +516,10 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
             int planId = selected != null ? selected.getDiscountPlanId() : 0;
             Customer updated = new Customer(
                     customerId,
-                    customer.getAccountNumber(),
                     nameField.getText().trim(),
                     emailField.getText().trim(),
                     phoneField.getText().trim(),
-                    customer.getAddress() != null ? customer.getAddress() : "",
+                    addressField.getText().trim(),
                     Double.parseDouble(limitField.getText().trim()),
                     customer.getCurrentBalance(),
                     customer.getAccountStatus(),
@@ -598,18 +593,6 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
         sp.getViewport().setBorder(null);
     }
 
-    private void focusCustomerRowByAccountNumber(String accountNumber) {
-        String marker = "(" + accountNumber + ")";
-        for (int i = 0; i < tableModel.getRowCount(); i++) {
-            Object nameCell = tableModel.getValueAt(i, 1);
-            if (nameCell != null && nameCell.toString().endsWith(marker)) {
-                table.setRowSelectionInterval(i, i);
-                Rectangle rect = table.getCellRect(i, 0, true);
-                table.scrollRectToVisible(rect);
-                return;
-            }
-        }
-    }
 
     private void applyTableTheme(JTable table) {
         table.setBackground(ThemeManager.tableBackground());
@@ -763,4 +746,5 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
             return new Color(r, g, b, c.getAlpha());
         }
     }
+
 }
