@@ -189,6 +189,7 @@ CREATE TABLE IF NOT EXISTS restock_orders (
     status VARCHAR(20) NOT NULL DEFAULT 'ACCEPTED',
     total_value DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     sa_order_id VARCHAR(100) NULL,
+    stock_received BOOLEAN NOT NULL DEFAULT FALSE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CHECK (status IN ('ACCEPTED', 'PROCESSED', 'DISPATCHED', 'DELIVERED')),
     CHECK (total_value >= 0)
@@ -327,3 +328,5 @@ CREATE TABLE IF NOT EXISTS merchants (
 
 
 
+-- Column backfills for older databases are handled in DatabaseSetup.runMigrations()
+-- using information_schema checks, which keeps startup idempotent across MySQL versions.

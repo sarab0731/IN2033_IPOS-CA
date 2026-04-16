@@ -37,6 +37,7 @@ public class DatabaseSetup {
             // Run Java-based migrations as a safety net — works on all MySQL versions
             // by using information_schema to check existence before altering.
             runMigrations();
+            repairInactiveProducts();
 
             seedDefaultUsers(conn);
             seedDefaultMerchant(conn);
@@ -60,6 +61,7 @@ public class DatabaseSetup {
         addColumnIfMissing("merchants",      "address",             "TEXT");
         addColumnIfMissing("merchants",      "sa_account_status",   "VARCHAR(20) NOT NULL DEFAULT 'NORMAL'");
         addColumnIfMissing("restock_orders", "sa_order_id",         "VARCHAR(100) NULL");
+        addColumnIfMissing("restock_orders", "stock_received",      "BOOLEAN NOT NULL DEFAULT FALSE");
     }
 
     private static void addColumnIfMissing(String table, String column, String definition) {
@@ -79,6 +81,34 @@ public class DatabaseSetup {
             }
         } catch (Exception e) {
             System.err.println("[DatabaseSetup] Migration failed for " + table + "." + column + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Repairs older/broken CA datasets where every product ended up inactive,
+     * which makes the Stock screen appear empty despite stock existing.
+     */
+    private static void repairInactiveProducts() {
+        try (Connection conn = DatabaseManager.getConnection()) {
+            int activeCount = 0;
+            int totalCount = 0;
+
+            try (PreparedStatement activeStmt = conn.prepareStatement("SELECT COUNT(*) FROM products WHERE is_active = 1");
+                 ResultSet activeRs = activeStmt.executeQuery()) {
+                if (activeRs.next()) activeCount = activeRs.getInt(1);
+            }
+
+            try (PreparedStatement totalStmt = conn.prepareStatement("SELECT COUNT(*) FROM products");
+                 ResultSet totalRs = totalStmt.executeQuery()) {
+                if (totalRs.next()) totalCount = totalRs.getInt(1);
+            }
+
+            if (totalCount > 0 && activeCount == 0) {
+                int repaired = conn.createStatement().executeUpdate("UPDATE products SET is_active = 1");
+                System.out.println("[DatabaseSetup] Repaired " + repaired + " inactive product(s) so stock is visible in CA.");
+            }
+        } catch (Exception e) {
+            System.err.println("[DatabaseSetup] Product activity repair failed: " + e.getMessage());
         }
     }
 

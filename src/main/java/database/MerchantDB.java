@@ -150,6 +150,11 @@ public class MerchantDB {
      */
     public static int ensureProduct(SACatalogueItem item) {
         String checkSql  = "SELECT product_id FROM products WHERE item_id = ?";
+        String reactivateSql = """
+                UPDATE products
+                SET description = ?, package_type = ?, units_in_pack = ?, price = ?, is_active = 1
+                WHERE item_id = ?
+                """;
         String insertSql = "INSERT INTO products " +
                            "(item_id, description, package_type, units_in_pack, price, vat_rate, stock_quantity, min_stock_level, is_active) " +
                            "VALUES (?, ?, ?, ?, ?, 0.0, 0, 0, 1)";
@@ -157,7 +162,17 @@ public class MerchantDB {
             try (PreparedStatement check = conn.prepareStatement(checkSql)) {
                 check.setString(1, item.getItemId());
                 ResultSet rs = check.executeQuery();
-                if (rs.next()) return rs.getInt("product_id");
+                if (rs.next()) {
+                    try (PreparedStatement reactivate = conn.prepareStatement(reactivateSql)) {
+                        reactivate.setString(1, item.getDescription());
+                        reactivate.setString(2, "Pack of " + item.getPackSize());
+                        reactivate.setInt(3, item.getPackSize());
+                        reactivate.setDouble(4, item.getUnitCost());
+                        reactivate.setString(5, item.getItemId());
+                        reactivate.executeUpdate();
+                    }
+                    return rs.getInt("product_id");
+                }
             }
             try (PreparedStatement ins = conn.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
                 ins.setString(1, item.getItemId());
