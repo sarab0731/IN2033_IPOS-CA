@@ -8,13 +8,26 @@ db.user=${DB_USER:-root}
 db.password=${DB_PASSWORD:-Password123}
 EOF
 
-# Start virtual framebuffer display
-Xvfb :1 -screen 0 1280x800x24 -ac +extension GLX +render -noreset &
 export DISPLAY=:1
-sleep 1
+
+# Clear stale X11 lock/socket files from previous runs.
+rm -f /tmp/.X1-lock
+rm -f /tmp/.X11-unix/X1
+mkdir -p /tmp/.X11-unix
+chmod 1777 /tmp/.X11-unix
+
+# Start virtual framebuffer display
+Xvfb "$DISPLAY" -screen 0 1280x800x24 -ac +extension GLX +render -noreset &
+
+for _ in $(seq 1 10); do
+  if xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
 
 # Start VNC server (no password, shared so multiple viewers can connect)
-x11vnc -display :1 -nopw -listen 0.0.0.0 -rfbport 5900 -forever -shared -quiet 2>/dev/null &
+x11vnc -display "$DISPLAY" -nopw -listen 0.0.0.0 -rfbport 5900 -forever -shared -quiet 2>/dev/null &
 sleep 1
 
 # Start noVNC — serves the web client and proxies to VNC on 5900
@@ -22,8 +35,8 @@ websockify --web=/usr/share/novnc/ 6080 localhost:5900 &
 
 echo "============================================"
 echo "  IPOS-CA GUI → http://localhost:6080/vnc.html"
-echo "  VNC direct   → localhost:5901 (no password)"
-echo "  API server   → http://localhost:8083"
+echo "  VNC direct   → localhost:5900 (no password)"
+echo "  API server   → http://localhost:8082"
 echo "============================================"
 
 # Launch the application (classpath includes all Maven dependencies)

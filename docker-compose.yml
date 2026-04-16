@@ -2,6 +2,8 @@ services:
 
   mysql:
     image: mysql:8.0
+    command:
+      - --mysqlx=0
     environment:
       MYSQL_ROOT_PASSWORD: Password123
       MYSQL_DATABASE: IPOS-CA
@@ -9,6 +11,8 @@ services:
     volumes:
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
       - mysql_data:/var/lib/mysql
+    tmpfs:
+      - /var/run/mysqld
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pPassword123"]
       interval: 10s
@@ -17,10 +21,11 @@ services:
       start_period: 30s
 
   app:
-    build: .
+    image: in2033_ipos-ca-app:latest
+    entrypoint: ["/bin/bash", "/app/start.sh"]
     ports:
       - "6080:6080"   # noVNC web GUI (open in browser)
-      - "5901:5901"   # VNC direct access
+      - "5901:5900"   # VNC direct access
       - "8082:8082"   # Embedded REST API
     environment:
       DB_URL: jdbc:mysql://mysql:3306/IPOS-CA
@@ -32,6 +37,7 @@ services:
       mysql:
         condition: service_healthy
     volumes:
+      - ./start.sh:/app/start.sh:ro
       - ./database:/app/database
       - ./exports:/app/exports
     extra_hosts:
