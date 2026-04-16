@@ -24,6 +24,9 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
     private JLabel roleLabel;
     private JLabel userNameLabel;
     private JLabel logoLabel;
+    private JLabel infoIconLabel;
+    private JLabel bellIconLabel;
+    private JLabel avatarLabel;
 
     private JButton toggleThemeBtn;
     private JButton logoutBtn;
@@ -135,40 +138,39 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         left.add(Box.createVerticalStrut(8));
         left.add(roleLabel);
 
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 0));
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         right.setOpaque(false);
 
-        JLabel infoIcon = new JLabel("ℹ");
-        infoIcon.setFont(new Font("SansSerif", Font.BOLD, 17));
-        infoIcon.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        infoIcon.setToolTipText("Merchant details");
-        infoIcon.addMouseListener(new java.awt.event.MouseAdapter() {
+        infoIconLabel = new JLabel(new InfoIcon(16, ThemeManager.textSecondary()));
+        infoIconLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        infoIconLabel.setToolTipText("Merchant details");
+        infoIconLabel.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseClicked(java.awt.event.MouseEvent e) {
-                showMerchantInfoPopup(infoIcon);
+                showMerchantInfoPopup(infoIconLabel);
             }
             @Override
             public void mouseEntered(java.awt.event.MouseEvent e) {
-                infoIcon.setForeground(ThemeManager.buttonDark());
+                infoIconLabel.setIcon(new InfoIcon(16, ThemeManager.textPrimary()));
             }
             @Override
             public void mouseExited(java.awt.event.MouseEvent e) {
-                infoIcon.setForeground(ThemeManager.textPrimary());
+                infoIconLabel.setIcon(new InfoIcon(16, ThemeManager.textSecondary()));
             }
         });
 
-        JLabel bell = new JLabel("🔔");
-        bell.setFont(new Font("SansSerif", Font.PLAIN, 16));
+        bellIconLabel = new JLabel(new BellIcon(16, ThemeManager.textSecondary()));
+        bellIconLabel.setBorder(new EmptyBorder(0, 2, 0, 2));
 
-        JLabel avatar = new JLabel("●");
-        avatar.setFont(new Font("SansSerif", Font.BOLD, 18));
+        avatarLabel = new JLabel(new AvatarDotIcon(14, ThemeManager.buttonDark()));
+        avatarLabel.setBorder(new EmptyBorder(0, 4, 0, 2));
 
         userNameLabel = new JLabel("Username");
         userNameLabel.setFont(new Font("SansSerif", Font.PLAIN, 13));
 
-        right.add(infoIcon);
-        right.add(bell);
-        right.add(avatar);
+        right.add(infoIconLabel);
+        right.add(bellIconLabel);
+        right.add(avatarLabel);
         right.add(userNameLabel);
 
         top.add(left, BorderLayout.WEST);
@@ -378,6 +380,15 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         if (userNameLabel != null) {
             userNameLabel.setForeground(ThemeManager.textPrimary());
         }
+        if (infoIconLabel != null) {
+            infoIconLabel.setIcon(new InfoIcon(16, ThemeManager.textSecondary()));
+        }
+        if (bellIconLabel != null) {
+            bellIconLabel.setIcon(new BellIcon(16, ThemeManager.textSecondary()));
+        }
+        if (avatarLabel != null) {
+            avatarLabel.setIcon(new AvatarDotIcon(14, ThemeManager.buttonDark()));
+        }
 
         if (toggleThemeBtn != null) {
             toggleThemeBtn.setText(getThemeToggleLabel());
@@ -455,5 +466,79 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         panel.setBorder(new EmptyBorder(18, 18, 18, 18));
 
         return panel;
+    }
+
+    private static class InfoIcon implements Icon {
+        private final int size;
+        private final Color color;
+
+        private InfoIcon(int size, Color color) {
+            this.size = size;
+            this.color = color;
+        }
+
+        @Override public int getIconWidth() { return size; }
+        @Override public int getIconHeight() { return size; }
+
+        @Override
+        public void paintIcon(Component c, Graphics g, int x, int y) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.setStroke(new BasicStroke(1.6f));
+            g2.drawOval(x + 1, y + 1, size - 3, size - 3);
+            g2.fillOval(x + size / 2 - 1, y + 4, 2, 2);
+            g2.drawLine(x + size / 2, y + 7, x + size / 2, y + size - 5);
+            g2.dispose();
+        }
+    }
+
+    private static class BellIcon implements Icon {
+        private final int size;
+        private final Color color;
+
+        private BellIcon(int size, Color color) {
+            this.size = size;
+            this.color = color;
+        }
+
+        @Override public int getIconWidth() { return size; }
+        @Override public int getIconHeight() { return size; }
+
+        @Override
+        public void paintIcon(Component c, Graphics g, int x, int y) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.setStroke(new BasicStroke(1.5f));
+            g2.drawArc(x + 3, y + 3, size - 6, size - 5, 25, 130);
+            g2.drawLine(x + 4, y + size - 4, x + size - 4, y + size - 4);
+            g2.drawLine(x + 4, y + size - 4, x + 5, y + 7);
+            g2.drawLine(x + size - 4, y + size - 4, x + size - 5, y + 7);
+            g2.fillOval(x + size / 2 - 1, y + size - 3, 3, 3);
+            g2.dispose();
+        }
+    }
+
+    private static class AvatarDotIcon implements Icon {
+        private final int size;
+        private final Color color;
+
+        private AvatarDotIcon(int size, Color color) {
+            this.size = size;
+            this.color = color;
+        }
+
+        @Override public int getIconWidth() { return size; }
+        @Override public int getIconHeight() { return size; }
+
+        @Override
+        public void paintIcon(Component c, Graphics g, int x, int y) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.fillOval(x, y, size, size);
+            g2.dispose();
+        }
     }
 }

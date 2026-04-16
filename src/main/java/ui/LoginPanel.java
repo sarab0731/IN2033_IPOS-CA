@@ -72,7 +72,7 @@ public class LoginPanel extends JPanel {
         passwordField.setOpaque(false);
         passwordField.setEchoChar('•');
 
-        JPanel usernameWrapper = createInputWrapper("👤", usernameField, null, new Dimension(300, 46));
+        JPanel usernameWrapper = createInputWrapper(new UserFieldIcon(), usernameField, null, new Dimension(300, 46));
         JPanel passwordWrapper = createPasswordWrapper(passwordField, new Dimension(300, 46));
 
         JLabel forgotPassword = new JLabel("<html><u>Forgot password?</u></html>");
@@ -194,11 +194,11 @@ public class LoginPanel extends JPanel {
     }
 
     private String askForTargetUsername() {
-        final JDialog dialog = createStyledDialog("Forgot Password", 420, 290);
+        final JDialog dialog = createStyledDialog("Forgot Password", 460, 300);
         final String[] resultHolder = {null};
 
         JPanel root = createDialogRoot();
-        RoundedPanel card = createDialogCard(380, 240);
+        RoundedPanel card = createDialogCard(400, 250);
         root.add(card);
 
         GridBagConstraints c = baseCardConstraints();
@@ -222,7 +222,7 @@ public class LoginPanel extends JPanel {
             resetUserField.setText(currentUsername);
         }
 
-        JPanel fieldWrap = createInputWrapper("👤", resetUserField, null, new Dimension(270, 50));
+        JPanel fieldWrap = createInputWrapper(new UserFieldIcon(), resetUserField, null, new Dimension(270, 50));
 
         JLabel statusLabel = new JLabel(" ");
         statusLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
@@ -238,23 +238,23 @@ public class LoginPanel extends JPanel {
         buttonRow.add(okButton);
 
         c.gridy = 0;
-        c.insets = new Insets(30, 36, 10, 36);
+        c.insets = new Insets(28, 34, 10, 34);
         card.add(title, c);
 
         c.gridy++;
-        c.insets = new Insets(0, 36, 20, 36);
+        c.insets = new Insets(0, 34, 18, 34);
         card.add(subtitle, c);
 
         c.gridy++;
-        c.insets = new Insets(0, 36, 8, 36);
+        c.insets = new Insets(0, 34, 8, 34);
         card.add(fieldWrap, c);
 
         c.gridy++;
-        c.insets = new Insets(4, 36, 0, 36);
+        c.insets = new Insets(4, 34, 0, 34);
         card.add(statusLabel, c);
 
         c.gridy++;
-        c.insets = new Insets(12, 36, 30, 36);
+        c.insets = new Insets(14, 34, 24, 34);
         card.add(buttonRow, c);
 
         Runnable submit = () -> {
@@ -286,17 +286,17 @@ public class LoginPanel extends JPanel {
     }
 
     private boolean showAdminApprovalDialog(String targetUsername) {
-        final JDialog dialog = createStyledDialog("Admin Approval Required", 460, 420);
+        final JDialog dialog = createStyledDialog("Admin Approval Required", 500, 450);
         final boolean[] approved = {false};
 
         JPanel root = createDialogRoot();
-        RoundedPanel card = createDialogCard(410, 360);
+        RoundedPanel card = createDialogCard(440, 390);
         root.add(card);
 
         GridBagConstraints c = baseCardConstraints();
 
         JLabel title = new JLabel("Admin Approval Required");
-        title.setFont(new Font("SansSerif", Font.BOLD, 26));
+        title.setFont(new Font("SansSerif", Font.BOLD, 24));
         title.setForeground(TEXT_DARK);
 
         JLabel subtitle = new JLabel("<html>Reset for user: <b>" + targetUsername + "</b><br>Admin approval is required before changing the password.</html>");
@@ -324,7 +324,7 @@ public class LoginPanel extends JPanel {
         adminPassField.setOpaque(false);
         adminPassField.setEchoChar('•');
 
-        JPanel adminUserWrap = createInputWrapper("👤", adminUserField, null, new Dimension(290, 50));
+        JPanel adminUserWrap = createInputWrapper(new UserFieldIcon(), adminUserField, null, new Dimension(290, 50));
         JPanel adminPassWrap = createPasswordWrapper(adminPassField, new Dimension(290, 50));
 
         JLabel statusLabel = new JLabel(" ");
@@ -341,35 +341,35 @@ public class LoginPanel extends JPanel {
         buttonRow.add(approveButton);
 
         c.gridy = 0;
-        c.insets = new Insets(28, 36, 10, 36);
+        c.insets = new Insets(26, 32, 10, 32);
         card.add(title, c);
 
         c.gridy++;
-        c.insets = new Insets(0, 36, 18, 36);
+        c.insets = new Insets(0, 32, 18, 32);
         card.add(subtitle, c);
 
         c.gridy++;
-        c.insets = new Insets(0, 36, 8, 36);
+        c.insets = new Insets(0, 32, 8, 32);
         card.add(adminUserLabel, c);
 
         c.gridy++;
-        c.insets = new Insets(0, 36, 14, 36);
+        c.insets = new Insets(0, 32, 14, 32);
         card.add(adminUserWrap, c);
 
         c.gridy++;
-        c.insets = new Insets(0, 36, 8, 36);
+        c.insets = new Insets(0, 32, 8, 32);
         card.add(adminPassLabel, c);
 
         c.gridy++;
-        c.insets = new Insets(0, 36, 10, 36);
+        c.insets = new Insets(0, 32, 10, 32);
         card.add(adminPassWrap, c);
 
         c.gridy++;
-        c.insets = new Insets(4, 36, 0, 36);
+        c.insets = new Insets(4, 32, 0, 32);
         card.add(statusLabel, c);
 
         c.gridy++;
-        c.insets = new Insets(14, 36, 28, 36);
+        c.insets = new Insets(14, 32, 24, 32);
         card.add(buttonRow, c);
 
         Runnable submit = () -> {
@@ -405,22 +405,22 @@ public class LoginPanel extends JPanel {
     }
 
     private void showResetPasswordCard(String usernameToReset) {
-        JDialog dialog = createStyledDialog("Reset Password", 470, 730);
+        JDialog dialog = createStyledDialog("Reset Password", 560, 560);
 
         JPanel root = createDialogRoot();
-        RoundedPanel card = createDialogCard(430, 680);
+        RoundedPanel card = createDialogCard(500, 500);
         root.add(card);
 
         GridBagConstraints c = baseCardConstraints();
 
         JLabel title = new JLabel("New password");
-        title.setFont(new Font("SansSerif", Font.BOLD, 32));
+        title.setFont(new Font("SansSerif", Font.BOLD, 28));
         title.setForeground(TEXT_DARK);
 
         JLabel subtitle = new JLabel(
                 "<html>Please set your new password, it must have at<br>least 8 characters.</html>"
         );
-        subtitle.setFont(new Font("SansSerif", Font.PLAIN, 16));
+        subtitle.setFont(new Font("SansSerif", Font.PLAIN, 15));
         subtitle.setForeground(TEXT_MID);
 
         JLabel newPasswordLabel = new JLabel("New password");
@@ -445,8 +445,8 @@ public class LoginPanel extends JPanel {
         confirmPasswordField.setOpaque(false);
         confirmPasswordField.setEchoChar('•');
 
-        JPanel newPassWrap = createPasswordWrapper(newPasswordField, new Dimension(300, 50));
-        JPanel confirmPassWrap = createPasswordWrapper(confirmPasswordField, new Dimension(300, 50));
+        JPanel newPassWrap = createPasswordWrapper(newPasswordField, new Dimension(330, 50));
+        JPanel confirmPassWrap = createPasswordWrapper(confirmPasswordField, new Dimension(330, 50));
 
         JLabel statusLabel = new JLabel(" ");
         statusLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
@@ -454,7 +454,7 @@ public class LoginPanel extends JPanel {
 
         JButton resetButton = createPrimaryButton(
                 "Reset Password",
-                new Dimension(300, 54),
+                new Dimension(330, 52),
                 8,
                 new Font("SansSerif", Font.BOLD, 17)
         );
@@ -465,41 +465,41 @@ public class LoginPanel extends JPanel {
         backLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
         c.gridy = 0;
-        c.insets = new Insets(58, 58, 14, 58);
+        c.insets = new Insets(34, 46, 12, 46);
         card.add(title, c);
 
         c.gridy++;
-        c.insets = new Insets(0, 58, 36, 58);
+        c.insets = new Insets(0, 46, 26, 46);
         card.add(subtitle, c);
 
         c.gridy++;
-        c.insets = new Insets(0, 58, 8, 58);
+        c.insets = new Insets(0, 46, 8, 46);
         card.add(newPasswordLabel, c);
 
         c.gridy++;
-        c.insets = new Insets(0, 58, 18, 58);
+        c.insets = new Insets(0, 46, 16, 46);
         card.add(newPassWrap, c);
 
         c.gridy++;
-        c.insets = new Insets(0, 58, 8, 58);
+        c.insets = new Insets(0, 46, 8, 46);
         card.add(confirmPasswordLabel, c);
 
         c.gridy++;
-        c.insets = new Insets(0, 58, 18, 58);
+        c.insets = new Insets(0, 46, 18, 46);
         card.add(confirmPassWrap, c);
 
         c.gridy++;
-        c.insets = new Insets(0, 58, 10, 58);
+        c.insets = new Insets(0, 46, 8, 46);
         card.add(resetButton, c);
 
         c.gridy++;
-        c.insets = new Insets(6, 58, 0, 58);
+        c.insets = new Insets(6, 46, 0, 46);
         card.add(statusLabel, c);
 
         c.gridy++;
         c.weighty = 1.0;
         c.anchor = GridBagConstraints.SOUTH;
-        c.insets = new Insets(0, 58, 48, 58);
+        c.insets = new Insets(20, 46, 28, 46);
         card.add(backLabel, c);
 
         Runnable submitReset = () -> {
@@ -573,13 +573,14 @@ public class LoginPanel extends JPanel {
         dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         dialog.setSize(width, height);
         dialog.setResizable(false);
+        dialog.getRootPane().setBorder(BorderFactory.createEmptyBorder());
         return dialog;
     }
 
     private JPanel createDialogRoot() {
         JPanel root = new JPanel(new GridBagLayout());
         root.setBackground(PAGE_BG);
-        root.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        root.setBorder(BorderFactory.createEmptyBorder(18, 18, 18, 18));
         return root;
     }
 
@@ -657,16 +658,14 @@ public class LoginPanel extends JPanel {
         return button;
     }
 
-    private JPanel createInputWrapper(String iconText, JTextField field, JButton trailingButton, Dimension size) {
+    private JPanel createInputWrapper(Icon icon, JTextField field, JButton trailingButton, Dimension size) {
         JPanel wrapper = new JPanel(new BorderLayout());
         wrapper.setBackground(Color.WHITE);
         wrapper.setBorder(new RoundedLineBorder(FIELD_BORDER, 2, 8));
         wrapper.setPreferredSize(size);
         wrapper.setMaximumSize(size);
 
-        JLabel iconLabel = new JLabel(iconText);
-        iconLabel.setFont(new Font("SansSerif", Font.PLAIN, 18));
-        iconLabel.setForeground(new Color(145, 145, 145));
+        JLabel iconLabel = new JLabel(icon);
         iconLabel.setBorder(BorderFactory.createEmptyBorder(0, 14, 0, 10));
 
         wrapper.add(iconLabel, BorderLayout.WEST);
@@ -680,13 +679,12 @@ public class LoginPanel extends JPanel {
     }
 
     private JPanel createPasswordWrapper(JPasswordField passwordField, Dimension size) {
-        JButton toggleButton = new JButton("👁");
+        JButton toggleButton = new JButton();
         toggleButton.setFocusPainted(false);
         toggleButton.setBorderPainted(false);
         toggleButton.setContentAreaFilled(false);
         toggleButton.setOpaque(false);
-        toggleButton.setForeground(new Color(150, 150, 150));
-        toggleButton.setFont(new Font("SansSerif", Font.PLAIN, 17));
+        toggleButton.setIcon(new EyeToggleIcon(false));
         toggleButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         toggleButton.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 14));
 
@@ -694,6 +692,7 @@ public class LoginPanel extends JPanel {
 
         toggleButton.addActionListener(e -> {
             visible[0] = !visible[0];
+            toggleButton.setIcon(new EyeToggleIcon(visible[0]));
             if (visible[0]) {
                 passwordField.setEchoChar((char) 0);
             } else {
@@ -701,7 +700,67 @@ public class LoginPanel extends JPanel {
             }
         });
 
-        return createInputWrapper("🔒", passwordField, toggleButton, size);
+        return createInputWrapper(new LockFieldIcon(), passwordField, toggleButton, size);
+    }
+
+    private static class UserFieldIcon implements Icon {
+        private final Color color = new Color(150, 150, 150);
+        @Override public int getIconWidth() { return 18; }
+        @Override public int getIconHeight() { return 18; }
+        @Override
+        public void paintIcon(Component c, Graphics g, int x, int y) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.fillOval(x + 4, y, 10, 10);
+            g2.drawOval(x + 4, y, 10, 10);
+            g2.drawArc(x + 2, y + 8, 14, 10, 0, -180);
+            g2.dispose();
+        }
+    }
+
+    private static class LockFieldIcon implements Icon {
+        private final Color color = new Color(150, 150, 150);
+        @Override public int getIconWidth() { return 18; }
+        @Override public int getIconHeight() { return 18; }
+        @Override
+        public void paintIcon(Component c, Graphics g, int x, int y) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.setStroke(new BasicStroke(1.8f));
+            g2.drawRoundRect(x + 3, y + 8, 12, 8, 3, 3);
+            g2.drawArc(x + 5, y + 2, 8, 10, 0, 180);
+            g2.dispose();
+        }
+    }
+
+    private static class EyeToggleIcon implements Icon {
+        private final boolean open;
+        private final Color color = new Color(150, 150, 150);
+
+        private EyeToggleIcon(boolean open) {
+            this.open = open;
+        }
+
+        @Override public int getIconWidth() { return 18; }
+        @Override public int getIconHeight() { return 18; }
+
+        @Override
+        public void paintIcon(Component c, Graphics g, int x, int y) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.setStroke(new BasicStroke(1.5f));
+            g2.drawArc(x + 1, y + 4, 16, 10, 0, 180);
+            g2.drawArc(x + 1, y + 4, 16, 10, 0, -180);
+            if (open) {
+                g2.fillOval(x + 7, y + 7, 4, 4);
+            } else {
+                g2.drawLine(x + 3, y + 15, x + 15, y + 3);
+            }
+            g2.dispose();
+        }
     }
 
     private static class RoundedPanel extends JPanel {
