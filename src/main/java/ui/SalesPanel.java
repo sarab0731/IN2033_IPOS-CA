@@ -679,15 +679,8 @@ public class SalesPanel extends JPanel implements ThemeManager.ThemeListener {
     }
 
     private void styleCombo(JComboBox<String> comboBox) {
-        comboBox.setFocusable(false);
-        comboBox.setOpaque(true);
-        comboBox.setBackground(ThemeManager.comboBackground());
-        comboBox.setForeground(ThemeManager.comboForeground());
+        ThemeManager.styleComboBox(comboBox);
         comboBox.setFont(new Font("SansSerif", Font.PLAIN, 14));
-        comboBox.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(ThemeManager.borderColor()),
-                new EmptyBorder(0, 8, 0, 8)
-        ));
     }
 
     private void styleRadio(JRadioButton radioButton) {
@@ -730,6 +723,11 @@ public class SalesPanel extends JPanel implements ThemeManager.ThemeListener {
 
         if (filterCombo != null) styleCombo(filterCombo);
         if (sortCombo != null) styleCombo(sortCombo);
+        if (searchField != null) {
+            ThemeManager.styleTextField(searchField);
+            boolean placeholder = "Search products...".equals(searchField.getText());
+            searchField.setForeground(placeholder ? ThemeManager.textSecondary() : ThemeManager.fieldForeground());
+        }
 
         if (accountHolderRadio != null) styleRadio(accountHolderRadio);
         if (occasionalCustomerRadio != null) styleRadio(occasionalCustomerRadio);

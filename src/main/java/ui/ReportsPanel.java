@@ -37,6 +37,10 @@ public class ReportsPanel extends JPanel implements ThemeManager.ThemeListener {
     private JTextField fromDateField;
     private JTextField toDateField;
     private JButton generateBtn;
+    private JButton turnoverTabBtn;
+    private JButton stockAvailabilityTabBtn;
+    private JButton customerDebtTabBtn;
+    private JButton exportPdfBtn;
 
     private JLabel fromLabel;
     private JLabel toLabel;
@@ -68,25 +72,25 @@ public class ReportsPanel extends JPanel implements ThemeManager.ThemeListener {
         topTabBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 18, 0));
         topTabBar.setOpaque(false);
 
-        JButton turnoverTab = new JButton("Turnover");
-        JButton stockAvailabilityTab = new JButton("Stock Availability");
-        JButton customerDebtTab = new JButton("Customer Debt");
-        JButton exportPdfBtn = new JButton("Export PDF");
+        turnoverTabBtn = new JButton("Turnover");
+        stockAvailabilityTabBtn = new JButton("Stock Availability");
+        customerDebtTabBtn = new JButton("Customer Debt");
+        exportPdfBtn = new JButton("Export PDF");
 
-        turnoverTab.setFocusable(false);
-        stockAvailabilityTab.setFocusable(false);
-        customerDebtTab.setFocusable(false);
+        turnoverTabBtn.setFocusable(false);
+        stockAvailabilityTabBtn.setFocusable(false);
+        customerDebtTabBtn.setFocusable(false);
         exportPdfBtn.setFont(new Font("SansSerif", Font.BOLD, 13));
 
 
-        turnoverTab.addActionListener(e -> { activeReport = "TURNOVER"; generateReport(); });
-        stockAvailabilityTab.addActionListener(e -> { activeReport = "STOCK"; generateReport(); });
-        customerDebtTab.addActionListener(e -> { activeReport = "DEBT"; generateReport(); });
+        turnoverTabBtn.addActionListener(e -> { activeReport = "TURNOVER"; generateReport(); applyTheme(); });
+        stockAvailabilityTabBtn.addActionListener(e -> { activeReport = "STOCK"; generateReport(); applyTheme(); });
+        customerDebtTabBtn.addActionListener(e -> { activeReport = "DEBT"; generateReport(); applyTheme(); });
         exportPdfBtn.addActionListener(e -> exportReportToPdf());
 
-        topTabBar.add(turnoverTab);
-        topTabBar.add(stockAvailabilityTab);
-        topTabBar.add(customerDebtTab);
+        topTabBar.add(turnoverTabBtn);
+        topTabBar.add(stockAvailabilityTabBtn);
+        topTabBar.add(customerDebtTabBtn);
 
         controlsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
         controlsPanel.setOpaque(false);
@@ -325,14 +329,39 @@ public class ReportsPanel extends JPanel implements ThemeManager.ThemeListener {
         button.setForeground(ThemeManager.textLight());
     }
 
-    private void styleField(JTextField field) {
-        field.setBackground(ThemeManager.fieldBackground());
-        field.setForeground(ThemeManager.fieldForeground());
-        field.setCaretColor(ThemeManager.fieldForeground());
-        field.setBorder(BorderFactory.createCompoundBorder(
+    private void styleSecondaryButton(JButton button) {
+        button.setFocusPainted(false);
+        button.setOpaque(true);
+        button.setFont(new Font("SansSerif", Font.BOLD, 13));
+        button.setBackground(ThemeManager.buttonLight());
+        button.setForeground(ThemeManager.textPrimary());
+        button.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(ThemeManager.borderColor()),
-                new EmptyBorder(8, 10, 8, 10)
+                new EmptyBorder(10, 18, 10, 18)
         ));
+    }
+
+    private void styleReportTab(JButton button, boolean active) {
+        if (button == null) return;
+        button.setFocusPainted(false);
+        button.setOpaque(true);
+        button.setFont(new Font("SansSerif", Font.BOLD, 13));
+        if (active) {
+            button.setBackground(ThemeManager.buttonDark());
+            button.setForeground(ThemeManager.textLight());
+            button.setBorder(BorderFactory.createEmptyBorder(10, 18, 10, 18));
+        } else {
+            button.setBackground(ThemeManager.buttonLight());
+            button.setForeground(ThemeManager.textPrimary());
+            button.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(ThemeManager.borderColor()),
+                    new EmptyBorder(10, 18, 10, 18)
+            ));
+        }
+    }
+
+    private void styleField(JTextField field) {
+        ThemeManager.styleTextField(field);
     }
 
     @Override
@@ -350,6 +379,10 @@ public class ReportsPanel extends JPanel implements ThemeManager.ThemeListener {
         if (fromDateField != null) styleField(fromDateField);
         if (toDateField != null) styleField(toDateField);
         if (generateBtn != null) stylePrimaryButton(generateBtn);
+        if (exportPdfBtn != null) styleSecondaryButton(exportPdfBtn);
+        if (turnoverTabBtn != null) styleReportTab(turnoverTabBtn, "TURNOVER".equals(activeReport));
+        if (stockAvailabilityTabBtn != null) styleReportTab(stockAvailabilityTabBtn, "STOCK".equals(activeReport));
+        if (customerDebtTabBtn != null) styleReportTab(customerDebtTabBtn, "DEBT".equals(activeReport));
 
         if (table != null) applyTableTheme(table);
         if (scrollPane != null) styleScrollPane(scrollPane);

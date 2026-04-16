@@ -38,10 +38,14 @@ public class TemplatesPanel extends JPanel implements ThemeManager.ThemeListener
 
     private final ScreenRouter router;
 
+    private JPanel contentPanel;
+    private JLabel hintLabel;
     private JTabbedPane tabs;
     private JTextArea reminder1Area;
     private JTextArea reminder2Area;
     private JTextArea invoiceArea;
+    private JButton resetBtn;
+    private JButton saveBtn;
 
     public TemplatesPanel(ScreenRouter router) {
         this.router = router;
@@ -63,16 +67,16 @@ public class TemplatesPanel extends JPanel implements ThemeManager.ThemeListener
     }
 
     private JPanel buildContent() {
-        JPanel content = new JPanel(new BorderLayout(12, 12));
-        content.setBorder(new EmptyBorder(8, 8, 8, 8));
+        contentPanel = new JPanel(new BorderLayout(12, 12));
+        contentPanel.setBorder(new EmptyBorder(8, 8, 8, 8));
 
-        JLabel hint = new JLabel(
+        hintLabel = new JLabel(
                 "<html>Available placeholders: <b>{customer_name}</b>, <b>{invoice_number}</b>, " +
                         "<b>{account_number}</b>, <b>{amount_due}</b>, <b>{signed_by}</b>, " +
                         "<b>{pharmacy_name}</b>, <b>{pharmacy_address}</b>, <b>{pharmacy_phone}</b>, <b>{pharmacy_email}</b></html>"
         );
-        hint.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        hint.setBorder(new EmptyBorder(0, 4, 8, 4));
+        hintLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        hintLabel.setBorder(new EmptyBorder(0, 4, 8, 4));
 
         tabs = new JTabbedPane();
 
@@ -87,8 +91,8 @@ public class TemplatesPanel extends JPanel implements ThemeManager.ThemeListener
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
         buttons.setOpaque(false);
 
-        JButton resetBtn = new JButton("Reset to Default");
-        JButton saveBtn  = new JButton("Save Templates");
+        resetBtn = new JButton("Reset to Default");
+        saveBtn  = new JButton("Save Templates");
 
         resetBtn.setFont(new Font("SansSerif", Font.BOLD, 13));
         saveBtn.setFont(new Font("SansSerif", Font.BOLD, 13));
@@ -103,11 +107,11 @@ public class TemplatesPanel extends JPanel implements ThemeManager.ThemeListener
         buttons.add(resetBtn);
         buttons.add(saveBtn);
 
-        content.add(hint,    BorderLayout.NORTH);
-        content.add(tabs,    BorderLayout.CENTER);
-        content.add(buttons, BorderLayout.SOUTH);
+        contentPanel.add(hintLabel, BorderLayout.NORTH);
+        contentPanel.add(tabs, BorderLayout.CENTER);
+        contentPanel.add(buttons, BorderLayout.SOUTH);
 
-        return content;
+        return contentPanel;
     }
 
     private JTextArea createTextArea() {
@@ -197,9 +201,42 @@ public class TemplatesPanel extends JPanel implements ThemeManager.ThemeListener
     @Override
     public void applyTheme() {
         setBackground(ThemeManager.appBackground());
-        if (reminder1Area != null) { reminder1Area.setBackground(ThemeManager.fieldBackground()); reminder1Area.setForeground(ThemeManager.textPrimary()); }
-        if (reminder2Area != null) { reminder2Area.setBackground(ThemeManager.fieldBackground()); reminder2Area.setForeground(ThemeManager.textPrimary()); }
-        if (invoiceArea   != null) { invoiceArea.setBackground(ThemeManager.fieldBackground());   invoiceArea.setForeground(ThemeManager.textPrimary()); }
+        if (contentPanel != null) contentPanel.setBackground(ThemeManager.appBackground());
+        if (hintLabel != null) hintLabel.setForeground(ThemeManager.textPrimary());
+        if (tabs != null) {
+            tabs.setOpaque(true);
+            tabs.setBackground(ThemeManager.panelBackground());
+            tabs.setForeground(ThemeManager.textPrimary());
+            tabs.setBorder(BorderFactory.createLineBorder(ThemeManager.borderColor()));
+            for (int i = 0; i < tabs.getTabCount(); i++) {
+                tabs.setBackgroundAt(i, i == tabs.getSelectedIndex()
+                        ? ThemeManager.buttonDark()
+                        : ThemeManager.buttonLight());
+                tabs.setForegroundAt(i, i == tabs.getSelectedIndex()
+                        ? ThemeManager.textLight()
+                        : ThemeManager.textPrimary());
+                Component tabComponent = tabs.getComponentAt(i);
+                if (tabComponent instanceof JScrollPane sp) {
+                    ThemeManager.styleScrollPane(sp, ThemeManager.fieldBackground());
+                }
+            }
+        }
+        if (reminder1Area != null) ThemeManager.styleTextArea(reminder1Area);
+        if (reminder2Area != null) ThemeManager.styleTextArea(reminder2Area);
+        if (invoiceArea != null) ThemeManager.styleTextArea(invoiceArea);
+        if (resetBtn != null) {
+            resetBtn.setBackground(ThemeManager.buttonLight());
+            resetBtn.setForeground(ThemeManager.textPrimary());
+            resetBtn.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(ThemeManager.borderColor()),
+                    new EmptyBorder(10, 18, 10, 18)
+            ));
+        }
+        if (saveBtn != null) {
+            saveBtn.setBackground(ThemeManager.buttonDark());
+            saveBtn.setForeground(ThemeManager.textLight());
+            saveBtn.setBorder(new EmptyBorder(10, 18, 10, 18));
+        }
         repaint(); revalidate();
     }
 }

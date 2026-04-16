@@ -1,5 +1,7 @@
 package ui;
 
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +30,7 @@ public class ThemeManager {
 
     public static void toggleTheme() {
         currentMode = isDark() ? ThemeMode.LIGHT : ThemeMode.DARK;
+        applyGlobalTheme();
         notifyListeners();
     }
 
@@ -45,6 +48,70 @@ public class ThemeManager {
         for (ThemeListener listener : new ArrayList<>(listeners)) {
             listener.applyTheme();
         }
+    }
+
+    public static void applyGlobalTheme() {
+        UIManager.put("Panel.background", panelBackground());
+        UIManager.put("Viewport.background", tableBackground());
+        UIManager.put("ScrollPane.background", tableBackground());
+
+        UIManager.put("Label.foreground", textPrimary());
+        UIManager.put("OptionPane.messageForeground", textPrimary());
+
+        UIManager.put("TextField.background", fieldBackground());
+        UIManager.put("TextField.foreground", fieldForeground());
+        UIManager.put("TextField.caretForeground", fieldForeground());
+        UIManager.put("PasswordField.background", fieldBackground());
+        UIManager.put("PasswordField.foreground", fieldForeground());
+        UIManager.put("PasswordField.caretForeground", fieldForeground());
+        UIManager.put("TextArea.background", fieldBackground());
+        UIManager.put("TextArea.foreground", fieldForeground());
+        UIManager.put("TextArea.caretForeground", fieldForeground());
+        UIManager.put("TextPane.background", fieldBackground());
+        UIManager.put("TextPane.foreground", fieldForeground());
+        UIManager.put("EditorPane.background", fieldBackground());
+        UIManager.put("EditorPane.foreground", fieldForeground());
+
+        UIManager.put("ComboBox.background", comboBackground());
+        UIManager.put("ComboBox.foreground", comboForeground());
+        UIManager.put("ComboBox.selectionBackground", selectionBackground());
+        UIManager.put("ComboBox.selectionForeground", textPrimary());
+
+        UIManager.put("List.background", comboBackground());
+        UIManager.put("List.foreground", comboForeground());
+        UIManager.put("List.selectionBackground", selectionBackground());
+        UIManager.put("List.selectionForeground", textPrimary());
+
+        UIManager.put("Table.background", tableBackground());
+        UIManager.put("Table.foreground", textPrimary());
+        UIManager.put("Table.selectionBackground", selectionBackground());
+        UIManager.put("Table.selectionForeground", textPrimary());
+        UIManager.put("Table.gridColor", tableGrid());
+        UIManager.put("TableHeader.background", tableHeaderBackground());
+        UIManager.put("TableHeader.foreground", textPrimary());
+
+        UIManager.put("TabbedPane.background", panelBackground());
+        UIManager.put("TabbedPane.foreground", textPrimary());
+        UIManager.put("TabbedPane.selected", buttonDark());
+        UIManager.put("TabbedPane.contentAreaColor", panelBackground());
+        UIManager.put("TabbedPane.focus", borderColor());
+
+        UIManager.put("Button.background", buttonLight());
+        UIManager.put("Button.foreground", textPrimary());
+        UIManager.put("ToggleButton.background", buttonLight());
+        UIManager.put("ToggleButton.foreground", textPrimary());
+
+        UIManager.put("PopupMenu.background", panelBackground());
+        UIManager.put("MenuItem.background", panelBackground());
+        UIManager.put("MenuItem.foreground", textPrimary());
+
+        UIManager.put("RadioButton.background", appBackground());
+        UIManager.put("RadioButton.foreground", textPrimary());
+        UIManager.put("CheckBox.background", appBackground());
+        UIManager.put("CheckBox.foreground", textPrimary());
+
+        UIManager.put("Separator.foreground", borderColor());
+        UIManager.put("Separator.background", borderColor());
     }
 
     public static Color appBackground() {
@@ -133,5 +200,71 @@ public class ThemeManager {
 
     public static Color selectionBackground() {
         return isDark() ? new Color(67, 74, 88) : new Color(235, 235, 235);
+    }
+
+    public static void styleTextField(JTextField field) {
+        if (field == null) return;
+        field.setOpaque(true);
+        field.setBackground(fieldBackground());
+        field.setForeground(fieldForeground());
+        field.setCaretColor(fieldForeground());
+        field.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(borderColor()),
+                new EmptyBorder(8, 10, 8, 10)
+        ));
+    }
+
+    public static void styleTextArea(JTextArea area) {
+        if (area == null) return;
+        area.setOpaque(true);
+        area.setBackground(fieldBackground());
+        area.setForeground(fieldForeground());
+        area.setCaretColor(fieldForeground());
+        area.setSelectionColor(selectionBackground());
+        area.setSelectedTextColor(textPrimary());
+        area.setBorder(BorderFactory.createEmptyBorder());
+    }
+
+    public static void styleComboBox(JComboBox<?> comboBox) {
+        if (comboBox == null) return;
+        comboBox.setOpaque(true);
+        comboBox.setFocusable(false);
+        comboBox.setBackground(comboBackground());
+        comboBox.setForeground(comboForeground());
+        comboBox.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(borderColor()),
+                new EmptyBorder(4, 8, 4, 8)
+        ));
+
+        ListCellRenderer<? super Object> renderer = new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+                                                          boolean isSelected, boolean cellHasFocus) {
+                JLabel label = (JLabel) super.getListCellRendererComponent(
+                        list, value, index, isSelected, cellHasFocus
+                );
+                label.setBorder(new EmptyBorder(6, 10, 6, 10));
+                if (isSelected) {
+                    label.setBackground(selectionBackground());
+                    label.setForeground(textPrimary());
+                } else {
+                    label.setBackground(comboBackground());
+                    label.setForeground(comboForeground());
+                }
+                return label;
+            }
+        };
+        @SuppressWarnings("unchecked")
+        JComboBox<Object> typedCombo = (JComboBox<Object>) comboBox;
+        typedCombo.setRenderer(renderer);
+    }
+
+    public static void styleScrollPane(JScrollPane scrollPane, Color viewBackground) {
+        if (scrollPane == null) return;
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.setOpaque(true);
+        scrollPane.setBackground(viewBackground);
+        scrollPane.getViewport().setBackground(viewBackground);
+        scrollPane.getViewport().setBorder(null);
     }
 }
