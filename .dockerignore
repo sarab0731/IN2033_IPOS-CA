@@ -1,5 +1,4 @@
-target/*
-!target/IPOS-CA-1.0-SNAPSHOT.jar
+target/
 .git/
 .idea/
 *.iml

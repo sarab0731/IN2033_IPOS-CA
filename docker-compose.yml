@@ -20,7 +20,7 @@ services:
     build: .
     ports:
       - "6080:6080"   # noVNC web GUI (open in browser)
-      - "5901:5900"   # VNC direct access
+      - "5901:5901"   # VNC direct access
       - "8082:8082"   # Embedded REST API
     environment:
       DB_URL: jdbc:mysql://mysql:3306/IPOS-CA
@@ -33,7 +33,6 @@ services:
         condition: service_healthy
     volumes:
       - ./database:/app/database
-      - ./sql:/app/sql
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

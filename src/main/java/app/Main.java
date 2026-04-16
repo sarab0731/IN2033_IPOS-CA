@@ -6,7 +6,6 @@ import domain.Merchant;
 import integration.CAApiServer;
 import integration.PUCachePull;
 import integration.ProductSyncScheduler;
-import integration.SAOrderSyncScheduler;
 import integration.SASync;
 import ui.MainFrame;
 
@@ -41,10 +40,6 @@ public class Main {
         // Start product sync scheduler (pushes CA products to PU every 30s)
         ProductSyncScheduler syncScheduler = new ProductSyncScheduler();
         syncScheduler.start();
-
-        // Keep local restock orders aligned with SA approvals/dispatch/delivery.
-        SAOrderSyncScheduler saOrderSyncScheduler = new SAOrderSyncScheduler();
-        saOrderSyncScheduler.start();
         
         SwingUtilities.invokeLater(() -> {
             MainFrame frame = new MainFrame();

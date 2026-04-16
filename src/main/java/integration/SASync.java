@@ -248,43 +248,4 @@ public class SASync {
             return null;
         }
     }
-
-    /**
-     * Parses the "Status: xxx" line from SA's tracked delivery text.
-     */
-    public static String parseTrackedOrderStatus(String trackingText) {
-        if (trackingText == null || trackingText.isBlank()) return null;
-        for (String line : trackingText.split("\n")) {
-            String trimmed = line.trim();
-            if (trimmed.startsWith("Status:")) {
-                String status = trimmed.substring("Status:".length()).trim();
-                int commaIdx = status.indexOf(',');
-                return commaIdx >= 0 ? status.substring(0, commaIdx).trim() : status;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Maps SA order statuses to CA's local lifecycle.
-     */
-    public static String mapSAStatusToCA(String saStatus) {
-        if (saStatus == null) return null;
-        return switch (saStatus.toLowerCase()) {
-            case "pending", "accepted" -> "ACCEPTED";
-            case "processing" -> "PROCESSED";
-            case "dispatched" -> "DISPATCHED";
-            case "delivered" -> "DELIVERED";
-            default -> null;
-        };
-    }
-
-    /**
-     * Returns true if next is a later lifecycle stage than current.
-     */
-    public static boolean isStatusProgression(String current, String next) {
-        if (current == null || next == null) return false;
-        java.util.List<String> stages = java.util.List.of("ACCEPTED", "PROCESSED", "DISPATCHED", "DELIVERED");
-        return stages.indexOf(next) > stages.indexOf(current);
-    }
 }
