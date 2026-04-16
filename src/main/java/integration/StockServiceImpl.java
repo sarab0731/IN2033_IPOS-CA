@@ -11,53 +11,64 @@ import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Implements {@link IStockService} for the PU subsystem.
+ * PU uses this to display CA stock to online shoppers, search for items,
+ * and confirm deductions after an online sale has been fulfilled.
+ */
 public class StockServiceImpl implements IStockService {
 
     /**
-     * PU calls this to get full details of a specific item by item ID.
+     * Returns full details for a single item by its item ID.
+     * PU uses this to show a product detail page.
+     *
+     * @param itemID the CA item ID
+     * @return the matching {@link CatalogueItem}, or {@code null} if not found
      */
     @Override
     public CatalogueItem itemAvailability(String itemID) {
-        return ProductDB.getAllProducts().stream()
-                .filter(p -> p.getItemId().equals(itemID))
-                .findFirst()
-                .map(this::toCatalogueItem)
-                .orElse(null);
+        Product product = ProductDB.getByItemId(itemID);
+        return product != null ? ProductMapper.toCatalogueItem(product) : null;
     }
 
     /**
-     * PU calls this to search stock by keyword.
+     * Searches CA stock by keyword against item ID and description.
+     * PU uses this for its product search screen.
+     *
+     * @param keyword case-insensitive search term
+     * @return list of matching {@link CatalogueItem}s (may be empty, never null)
      */
     @Override
     public List<CatalogueItem> searchStock(String keyword) {
-        String lower = keyword.toLowerCase();
-        return ProductDB.getAllProducts().stream()
-                .filter(p -> p.getDescription().toLowerCase().contains(lower)
-                        || p.getItemId().toLowerCase().contains(lower))
-                .map(this::toCatalogueItem)
+        return ProductDB.searchProducts(keyword).stream()
+                .map(ProductMapper::toCatalogueItem)
                 .collect(Collectors.toList());
     }
 
     /**
-     * PU calls this after a confirmed online sale to deduct stock from CA.
+     * Deducts one unit of the given item from CA stock after an online sale.
+     * PU calls this when a confirmed order line is dispatched.
+     *
+     * @param itemID the CA item ID
+     * @return "OK: Stock deducted for &lt;itemID&gt;" on success,
+     *         or an "ERROR: ..." message if the item is missing, out of stock,
+     *         or the update fails
      */
     @Override
     public String deductStock(String itemID) {
-        Product product = ProductDB.getAllProducts().stream()
-                .filter(p -> p.getItemId().equals(itemID))
-                .findFirst()
-                .orElse(null);
-
-        if (product == null) return "ERROR: Item not found - " + itemID;
+        Product product = ProductDB.getByItemId(itemID);
+        if (product == null)                 return "ERROR: Item not found - " + itemID;
         if (product.getStockQuantity() <= 0) return "ERROR: Out of stock - " + itemID;
 
-        String sql = "UPDATE products SET stock_quantity = stock_quantity - 1 WHERE item_id = ?";
+        String sql = "UPDATE products SET stock_quantity = stock_quantity - 1 " +
+                     "WHERE item_id = ? AND stock_quantity >= 1";
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, itemID);
-            stmt.executeUpdate();
+            int rows = stmt.executeUpdate();
+            if (rows == 0) return "ERROR: Stock update failed (race condition) for " + itemID;
             return "OK: Stock deducted for " + itemID;
 
         } catch (Exception e) {
@@ -67,24 +78,13 @@ public class StockServiceImpl implements IStockService {
     }
 
     /**
-     * Returns full catalogue for PU to display.
+     * Returns the full CA product catalogue.
+     * PU uses this to populate its product listing.
      */
     @Override
     public List<CatalogueItem> getCatalogue() {
         return ProductDB.getAllProducts().stream()
-                .map(this::toCatalogueItem)
+                .map(ProductMapper::toCatalogueItem)
                 .collect(Collectors.toList());
-    }
-
-    // maps Product → CatalogueItem (the shared domain object)
-    private CatalogueItem toCatalogueItem(Product p) {
-        CatalogueItem item = new CatalogueItem();
-        item.setItemId(p.getItemId());
-        item.setDescription(p.getDescription());
-        item.setPackageType(p.getPackageType());
-        item.setUnitsInPack(p.getUnitsInPack());
-        item.setPrice(p.getPrice());
-        item.setAvailability(p.getStockQuantity());
-        return item;
     }
 }

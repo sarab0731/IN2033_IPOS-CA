@@ -37,21 +37,17 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
     private JPanel tableCard;
     private JPanel topToolbar;
     private JPanel bottomActionBar;
-    private JPanel footerPanel;
     private JLabel warningLabel;
     private JTable table;
     private JScrollPane scrollPane;
     private JButton editBtn;
     private JButton deleteBtn;
-    private JButton restockBtn;
     private JButton refreshBtn;
     private JComboBox<String> filterCombo;
     private JComboBox<String> sortCombo;
     private DefaultTableModel tableModel;
     private final List<Product> allProducts     = new ArrayList<>();
     private final List<Product> visibleProducts = new ArrayList<>();
-    private int currentPage = 1;
-    private static final int PAGE_SIZE = 15;
 
     // ── SA Catalogue components ──────────────────────────────────────────────
     private JTable saTable;
@@ -140,17 +136,11 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
 
         buildToolbar();
         buildTable();
-        buildFooter();
         buildBottomActionBar();
 
-        tableCard.add(topToolbar, BorderLayout.NORTH);
-        tableCard.add(scrollPane, BorderLayout.CENTER);
-
-        JPanel southWrapper = new JPanel(new BorderLayout(12, 12));
-        southWrapper.setOpaque(false);
-        southWrapper.add(footerPanel,      BorderLayout.NORTH);
-        southWrapper.add(bottomActionBar,  BorderLayout.SOUTH);
-        tableCard.add(southWrapper, BorderLayout.SOUTH);
+        tableCard.add(topToolbar,      BorderLayout.NORTH);
+        tableCard.add(scrollPane,      BorderLayout.CENTER);
+        tableCard.add(bottomActionBar, BorderLayout.SOUTH);
 
         panel.add(tableCard, BorderLayout.CENTER);
         return panel;
@@ -183,22 +173,14 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         styleScrollPane(scrollPane);
     }
 
-    private void buildFooter() {
-        footerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
-        footerPanel.setOpaque(false);
-        // Chips are built dynamically by refreshFooter() after each table refresh
-    }
-
     private void buildBottomActionBar() {
         bottomActionBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         bottomActionBar.setOpaque(false);
         editBtn    = createPillButton("Edit Product",   false);
         deleteBtn  = createPillButton("Remove Product", false);
-        restockBtn = createPillButton("Restock",        false);
         refreshBtn = createPillButton("Refresh",        false);
         bottomActionBar.add(editBtn);
         bottomActionBar.add(deleteBtn);
-        bottomActionBar.add(restockBtn);
         bottomActionBar.add(refreshBtn);
     }
 
@@ -324,23 +306,8 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
             if (ok == JOptionPane.YES_OPTION) { ProductDB.deleteProduct(visibleProducts.get(idx).getProductId()); loadTable(); }
         });
 
-        restockBtn.addActionListener(e -> {
-            int idx = getSelectedVisibleIndex();
-            if (idx == -1) { JOptionPane.showMessageDialog(this, "Please select a product to restock."); return; }
-            String input = JOptionPane.showInputDialog(this, "Quantity to add:");
-            if (input == null || input.trim().isEmpty()) return;
-            try {
-                int qty = Integer.parseInt(input.trim());
-                if (qty <= 0) throw new NumberFormatException();
-                ProductDB.updateStock(visibleProducts.get(idx).getProductId(), qty);
-                loadTable();
-            } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(this, "Please enter a valid positive quantity.");
-            }
-        });
-
-        filterCombo.addActionListener(e -> { currentPage = 1; refreshTableView(); });
-        sortCombo.addActionListener(e ->   { currentPage = 1; refreshTableView(); });
+        filterCombo.addActionListener(e -> refreshTableView());
+        sortCombo.addActionListener(e ->   refreshTableView());
 
         // SA Catalogue
         saSearchField.addFocusListener(new java.awt.event.FocusAdapter() {
@@ -613,13 +580,7 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
             case "Sort by: Description" -> filtered.sort(Comparator.comparing(Product::getDescription, String.CASE_INSENSITIVE_ORDER));
         }
 
-        // Pagination
-        int totalPages = Math.max(1, (int) Math.ceil((double) filtered.size() / PAGE_SIZE));
-        currentPage = Math.max(1, Math.min(currentPage, totalPages));
-        int from = (currentPage - 1) * PAGE_SIZE;
-        int to   = Math.min(from + PAGE_SIZE, filtered.size());
-
-        visibleProducts.addAll(filtered.subList(from, to));
+        visibleProducts.addAll(filtered);
         for (Product p : visibleProducts)
             tableModel.addRow(new Object[]{
                     String.format("%03d", p.getProductId()),
@@ -630,50 +591,7 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
                     getStatusText(p)
             });
 
-        refreshFooter(totalPages);
         applyTheme();
-    }
-
-    private void refreshFooter(int totalPages) {
-        if (footerPanel == null) return;
-        footerPanel.removeAll();
-
-        // Prev arrow
-        JButton prev = createPageChip("‹", false);
-        prev.setEnabled(currentPage > 1);
-        if (currentPage > 1) prev.addActionListener(e -> { currentPage--; refreshTableView(); });
-        footerPanel.add(prev);
-
-        // Page window: up to 5 pages centred on currentPage
-        int start = Math.max(1, currentPage - 2);
-        int end   = Math.min(totalPages, start + 4);
-        start     = Math.max(1, end - 4);
-
-        if (start > 1) {
-            footerPanel.add(createPageChipWithAction("1", 1 == currentPage, 1));
-            if (start > 2) { JButton dots = createPageChip("…", false); dots.setEnabled(false); footerPanel.add(dots); }
-        }
-        for (int i = start; i <= end; i++)
-            footerPanel.add(createPageChipWithAction(String.valueOf(i), i == currentPage, i));
-        if (end < totalPages) {
-            if (end < totalPages - 1) { JButton dots = createPageChip("…", false); dots.setEnabled(false); footerPanel.add(dots); }
-            footerPanel.add(createPageChipWithAction(String.valueOf(totalPages), totalPages == currentPage, totalPages));
-        }
-
-        // Next arrow
-        JButton next = createPageChip("›", false);
-        next.setEnabled(currentPage < totalPages);
-        if (currentPage < totalPages) next.addActionListener(e -> { currentPage++; refreshTableView(); });
-        footerPanel.add(next);
-
-        footerPanel.revalidate();
-        footerPanel.repaint();
-    }
-
-    private JButton createPageChipWithAction(String text, boolean active, int page) {
-        JButton btn = createPageChip(text, active);
-        if (!active) btn.addActionListener(e -> { currentPage = page; refreshTableView(); });
-        return btn;
     }
 
     private String getStatusText(Product p) {
@@ -757,6 +675,8 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         JViewport vp = sp.getViewport();
         vp.setBackground(ThemeManager.tableBackground());
         vp.setBorder(null); vp.setOpaque(true);
+        sp.getVerticalScrollBar().setBackground(ThemeManager.panelBackground());
+        sp.getHorizontalScrollBar().setBackground(ThemeManager.panelBackground());
     }
 
     private void styleSAScrollPane(JScrollPane sp) {
@@ -764,6 +684,8 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         sp.setBackground(ThemeManager.tableBackground());
         sp.getViewport().setBackground(ThemeManager.tableBackground());
         sp.getViewport().setBorder(null);
+        sp.getVerticalScrollBar().setBackground(ThemeManager.panelBackground());
+        sp.getHorizontalScrollBar().setBackground(ThemeManager.panelBackground());
     }
 
     // ── Theme ────────────────────────────────────────────────────────────────
@@ -775,13 +697,11 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         if (tableCard       != null) tableCard.setBackground(ThemeManager.panelBackground());
         if (topToolbar      != null) topToolbar.setBackground(ThemeManager.panelBackground());
         if (bottomActionBar != null) bottomActionBar.setBackground(ThemeManager.panelBackground());
-        if (footerPanel     != null) footerPanel.setBackground(ThemeManager.panelBackground());
         if (warningLabel    != null) warningLabel.setForeground(ProductDB.getLowStockCount() > 0
                 ? new Color(190, 76, 76) : ThemeManager.textSecondary());
 
         if (editBtn    != null) stylePillButton(editBtn,    false);
         if (deleteBtn  != null) stylePillButton(deleteBtn,  false);
-        if (restockBtn != null) stylePillButton(restockBtn, false);
         if (refreshBtn != null) stylePillButton(refreshBtn, false);
         if (filterCombo != null) styleComboBox(filterCombo);
         if (sortCombo   != null) styleComboBox(sortCombo);
@@ -834,19 +754,6 @@ public class StockPanel extends JPanel implements ThemeManager.ThemeListener {
         btn.setBorder(new EmptyBorder(10, 20, 10, 20));
         btn.setBackground(active ? ThemeManager.buttonDark() : ThemeManager.buttonLight());
         btn.setForeground(active ? ThemeManager.textLight()  : ThemeManager.textPrimary());
-        return btn;
-    }
-
-    private JButton createPageChip(String text, boolean active) {
-        JButton btn = new JButton(text);
-        btn.setFocusPainted(false); btn.setOpaque(true); btn.setContentAreaFilled(true);
-        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
-        btn.setPreferredSize(new Dimension(26, 24));
-        btn.setBorder(BorderFactory.createEmptyBorder());
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setBackground(active ? new Color(77, 77, 77)
-                : (ThemeManager.isDark() ? new Color(55, 58, 66) : new Color(245, 245, 245)));
-        btn.setForeground(active ? Color.WHITE : ThemeManager.textSecondary());
         return btn;
     }
 

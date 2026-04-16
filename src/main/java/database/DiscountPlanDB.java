@@ -192,12 +192,12 @@ public class DiscountPlanDB {
      *
      * @param year  e.g. 2026
      * @param month 1–12
-     * @return number of credits created
+     * @return list of newly created credits: each Object[] is
+     *         [creditId, customerId, fullName, "YYYY-MM", spend, rate, creditAmount]
      */
-    public static int processMonthEndCredits(int year, int month) {
-        // Sum of sales subtotals per customer for the period, flexible-plan customers only
+    public static List<Object[]> processMonthEndCredits(int year, int month) {
         String spendSql = """
-            SELECT ca.customer_id, ca.discount_plan_id,
+            SELECT ca.customer_id, ca.full_name, ca.discount_plan_id,
                    COALESCE(SUM(s.subtotal), 0) AS monthly_spend
             FROM customer_accounts ca
             JOIN discount_plans dp ON ca.discount_plan_id = dp.discount_plan_id
@@ -208,7 +208,7 @@ public class DiscountPlanDB {
                 AND MONTH(s.sale_datetime) = ?
             WHERE dp.plan_type = 'FLEXIBLE'
               AND ca.is_active = 1
-            GROUP BY ca.customer_id, ca.discount_plan_id
+            GROUP BY ca.customer_id, ca.full_name, ca.discount_plan_id
             """;
 
         String alreadyDoneSql = """
@@ -223,7 +223,9 @@ public class DiscountPlanDB {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
-        int created = 0;
+        String period = year + "-" + String.format("%02d", month);
+        List<Object[]> created = new ArrayList<>();
+
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement spendStmt = conn.prepareStatement(spendSql)) {
 
@@ -232,11 +234,12 @@ public class DiscountPlanDB {
             ResultSet rs = spendStmt.executeQuery();
 
             while (rs.next()) {
-                int customerId   = rs.getInt("customer_id");
-                int planId       = rs.getInt("discount_plan_id");
-                double spend     = rs.getDouble("monthly_spend");
+                int    customerId = rs.getInt("customer_id");
+                String fullName   = rs.getString("full_name");
+                int    planId     = rs.getInt("discount_plan_id");
+                double spend      = rs.getDouble("monthly_spend");
 
-                // Skip if already processed
+                // Skip if already processed for this period
                 try (PreparedStatement chk = conn.prepareStatement(alreadyDoneSql)) {
                     chk.setInt(1, customerId); chk.setInt(2, year); chk.setInt(3, month);
                     ResultSet cr = chk.executeQuery();
@@ -245,11 +248,10 @@ public class DiscountPlanDB {
 
                 double rate   = resolveFlexibleRate(planId, spend);
                 double credit = spend * (rate / 100.0);
-
-                // Only store if there's an actual credit (spend > 0 and rate > 0)
                 if (credit <= 0) continue;
 
-                try (PreparedStatement ins = conn.prepareStatement(insertSql)) {
+                try (PreparedStatement ins = conn.prepareStatement(
+                        insertSql, Statement.RETURN_GENERATED_KEYS)) {
                     ins.setInt(1, customerId);
                     ins.setInt(2, planId);
                     ins.setInt(3, year);
@@ -259,14 +261,91 @@ public class DiscountPlanDB {
                     ins.setDouble(7, credit);
                     ins.setDouble(8, credit);  // remaining = full amount initially
                     ins.executeUpdate();
-                    created++;
+
+                    ResultSet keys = ins.getGeneratedKeys();
+                    int creditId = keys.next() ? keys.getInt(1) : -1;
+                    created.add(new Object[]{creditId, customerId, fullName, period, spend, rate, credit});
                 }
                 System.out.println("[DiscountPlanDB] Created credit: customer=" + customerId
-                        + " spend=£" + String.format("%.2f", spend)
+                        + " (" + fullName + ") spend=£" + String.format("%.2f", spend)
                         + " rate=" + rate + "% credit=£" + String.format("%.2f", credit));
             }
         } catch (Exception e) { e.printStackTrace(); }
         return created;
+    }
+
+    /**
+     * Automatically processes flexible discount credits for every complete calendar
+     * month that has FLEXIBLE-plan sales but no credit record yet, up to (but not
+     * including) the current simulated month.
+     *
+     * Call this before reading pending credits (e.g. at sale time) so credits are
+     * always available without requiring manual intervention.
+     *
+     * @param today the current simulated date from TimeManager
+     */
+    public static void autoProcessPastMonths(java.time.LocalDate today) {
+        // Find the earliest sale month across all FLEXIBLE-plan customers
+        String earliestSql = """
+            SELECT MIN(YEAR(s.sale_datetime)), MIN(MONTH(s.sale_datetime))
+            FROM sales s
+            JOIN customer_accounts ca ON s.customer_id = ca.customer_id
+            JOIN discount_plans dp    ON ca.discount_plan_id = dp.discount_plan_id
+            WHERE dp.plan_type = 'FLEXIBLE'
+              AND s.sale_type  = 'ACCOUNT'
+            """;
+        java.time.LocalDate firstMonth = null;
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(earliestSql);
+             ResultSet rs = stmt.executeQuery()) {
+            if (rs.next() && rs.getObject(1) != null) {
+                firstMonth = java.time.LocalDate.of(rs.getInt(1), rs.getInt(2), 1);
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+
+        if (firstMonth == null) return; // no FLEXIBLE sales at all
+
+        // Process every month from firstMonth up to last complete month
+        java.time.LocalDate cursor   = firstMonth.withDayOfMonth(1);
+        java.time.LocalDate lastDone = today.withDayOfMonth(1); // exclusive upper bound
+
+        while (cursor.isBefore(lastDone)) {
+            processMonthEndCredits(cursor.getYear(), cursor.getMonthValue());
+            cursor = cursor.plusMonths(1);
+        }
+    }
+
+    /**
+     * Returns true if any FLEXIBLE-plan customer had ACCOUNT sales in the given
+     * month but has not yet been processed (no credit record for that period).
+     * Used to auto-detect when the panel opens whether month-end is overdue.
+     */
+    public static boolean hasUnprocessedFlexibleMonth(int year, int month) {
+        String sql = """
+            SELECT COUNT(DISTINCT ca.customer_id)
+            FROM customer_accounts ca
+            JOIN discount_plans dp ON ca.discount_plan_id = dp.discount_plan_id
+            JOIN sales s ON s.customer_id = ca.customer_id
+                AND s.sale_type = 'ACCOUNT'
+                AND YEAR(s.sale_datetime) = ?
+                AND MONTH(s.sale_datetime) = ?
+            WHERE dp.plan_type = 'FLEXIBLE'
+              AND ca.is_active = 1
+              AND NOT EXISTS (
+                SELECT 1 FROM flexible_discount_credits fdc
+                WHERE fdc.customer_id = ca.customer_id
+                  AND fdc.period_year = ?
+                  AND fdc.period_month = ?
+              )
+            """;
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, year); stmt.setInt(2, month);
+            stmt.setInt(3, year); stmt.setInt(4, month);
+            ResultSet rs = stmt.executeQuery();
+            return rs.next() && rs.getInt(1) > 0;
+        } catch (Exception e) { e.printStackTrace(); }
+        return false;
     }
 
     // -------------------------------------------------------------------------
@@ -292,8 +371,8 @@ public class DiscountPlanDB {
     }
 
     /**
-     * Consumes up to {@code amount} from the customer's oldest pending credits.
-     * Returns the actual amount consumed (may be less than requested if credit runs out).
+     * Consumes up to {@code amount} from the customer's oldest pending credits (FIFO).
+     * Returns the actual amount consumed (may be less if credit runs out).
      */
     public static double consumeCredit(int customerId, double amount) {
         String fetchSql = """
@@ -313,7 +392,7 @@ public class DiscountPlanDB {
             double remaining = amount;
 
             while (rs.next() && remaining > 0) {
-                int creditId       = rs.getInt("credit_id");
+                int    creditId    = rs.getInt("credit_id");
                 double avail       = rs.getDouble("remaining_credit");
                 double take        = Math.min(avail, remaining);
                 double newRemaining = avail - take;
@@ -330,8 +409,10 @@ public class DiscountPlanDB {
     }
 
     /**
-     * Returns a summary of all credits for display in DiscountPlansPanel.
-     * Each row: [customer_id, full_name, period, monthly_spend, rate, credit_amount, remaining]
+     * Returns all credits for display in DiscountPlansPanel.
+     * Each row: [creditId, customerId, fullName, period, monthlySpend, rate,
+     *            creditAmount, status, remaining]
+     * status = "Pending" | "Partially Used" | "Consumed"
      */
     public static List<Object[]> getAllCredits() {
         List<Object[]> list = new ArrayList<>();
@@ -348,6 +429,16 @@ public class DiscountPlanDB {
              PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
             while (rs.next()) {
+                double remaining = rs.getDouble("remaining_credit");
+                double creditAmt = rs.getDouble("credit_amount");
+                String status;
+                if (remaining <= 0) {
+                    status = "Consumed";
+                } else if (remaining < creditAmt) {
+                    status = "Partially Used";
+                } else {
+                    status = "Pending";
+                }
                 list.add(new Object[]{
                         rs.getInt("credit_id"),
                         rs.getInt("customer_id"),
@@ -355,8 +446,9 @@ public class DiscountPlanDB {
                         rs.getString("period_year") + "-" + String.format("%02d", rs.getInt("period_month")),
                         String.format("£%.2f", rs.getDouble("monthly_spend")),
                         String.format("%.1f%%", rs.getDouble("rate_applied")),
-                        String.format("£%.2f", rs.getDouble("credit_amount")),
-                        String.format("£%.2f", rs.getDouble("remaining_credit"))
+                        String.format("£%.2f", creditAmt),
+                        status,
+                        String.format("£%.2f", remaining)
                 });
             }
         } catch (Exception e) { e.printStackTrace(); }

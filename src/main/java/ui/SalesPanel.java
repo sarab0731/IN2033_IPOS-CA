@@ -557,6 +557,8 @@ public class SalesPanel extends JPanel implements ThemeManager.ThemeListener {
                 if (plan.isFixed()) {
                     discountAmount = subtotalForDiscount * (plan.getDiscountPercent() / 100.0);
                 } else if (plan.isFlexible()) {
+                    // Auto-process any unprocessed past months before reading credits
+                    database.DiscountPlanDB.autoProcessPastMonths(app.TimeManager.today());
                     double pendingCredit = database.DiscountPlanDB.getPendingCredit(selectedCustomer.getCustomerId());
                     discountAmount = Math.min(pendingCredit, subtotalForDiscount);
                 }

@@ -4,7 +4,7 @@ import database.DatabaseManager;
 import database.ProductDB;
 import domain.Product;
 import org.json.JSONArray;
-import org.json.JSONObject;
+import org.json.JSONObject;  // used for parsing pendingChanges entries
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -99,20 +99,7 @@ public class PUSync {
         }
         
         JSONArray arr = new JSONArray();
-        for (Product p : products) {
-            JSONObject obj = new JSONObject();
-            obj.put("productId", p.getProductId());
-            obj.put("itemId", p.getItemId());
-            obj.put("description", p.getDescription());
-            obj.put("packageType", p.getPackageType() != null ? p.getPackageType() : "");
-            obj.put("unitsInPack", p.getUnitsInPack());
-            obj.put("price", p.getPrice());
-            obj.put("vatRate", p.getVatRate());
-            obj.put("stockQuantity", p.getStockQuantity());
-            obj.put("minStockLevel", p.getMinStockLevel());
-            obj.put("isActive", 1);
-            arr.put(obj);
-        }
+        for (Product p : products) arr.put(ProductMapper.toJson(p));
         
         boolean pushed = PUApiClient.pushProductsToCache(arr.toString());
         if (pushed) {

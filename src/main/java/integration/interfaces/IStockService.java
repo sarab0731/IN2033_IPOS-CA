@@ -33,6 +33,6 @@ public interface IStockService {
 	/**
 	 * Returns a List of CatalogueItems which contains all information on all catalogue items
 	 */
-	List getCatalogue();
+	List<CatalogueItem> getCatalogue();
 
 }

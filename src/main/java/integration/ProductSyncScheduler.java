@@ -3,7 +3,6 @@ package integration;
 import database.ProductDB;
 import domain.Product;
 import org.json.JSONArray;
-import org.json.JSONObject;
 
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -48,22 +47,9 @@ public class ProductSyncScheduler {
                 return;
             }
 
-            // 2. Convert to JSON array with all fields
+            // 2. Convert to JSON array
             JSONArray productsJson = new JSONArray();
-            for (Product p : products) {
-                JSONObject obj = new JSONObject();
-                obj.put("productId", p.getProductId());
-                obj.put("itemId", p.getItemId());
-                obj.put("description", p.getDescription());
-                obj.put("packageType", p.getPackageType() != null ? p.getPackageType() : "");
-                obj.put("unitsInPack", p.getUnitsInPack());
-                obj.put("price", p.getPrice());
-                obj.put("vatRate", p.getVatRate());
-                obj.put("stockQuantity", p.getStockQuantity());
-                obj.put("minStockLevel", p.getMinStockLevel());
-                obj.put("isActive", 1);
-                productsJson.put(obj);
-            }
+            for (Product p : products) productsJson.put(ProductMapper.toJson(p));
 
             // 3. Push to PU cache
             boolean success = PUApiClient.pushProductsToCache(productsJson.toString());

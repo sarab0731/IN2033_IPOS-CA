@@ -60,12 +60,35 @@ public class DatabaseManager {
 
     /**
      * Applies incremental DDL migrations on every startup.
-     * Uses JDBC metadata checks so re-runs are always safe.
+     * All operations are idempotent — safe to run on every boot.
      */
     public static void runMigrations() {
-        try (Connection conn = getConnection()) {
-            addColumnIfMissing(conn, "payment_reminders", "eligible_after",
-                    "DATETIME NULL");
+        try (Connection conn = getConnection();
+             java.sql.Statement stmt = conn.createStatement()) {
+
+            // ── Table migrations (CREATE IF NOT EXISTS) ───────────────────────
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS flexible_discount_credits (
+                    credit_id        INT AUTO_INCREMENT PRIMARY KEY,
+                    customer_id      INT NOT NULL,
+                    discount_plan_id INT NOT NULL,
+                    period_year      INT NOT NULL,
+                    period_month     INT NOT NULL,
+                    monthly_spend    DECIMAL(10,2) NOT NULL,
+                    rate_applied     DECIMAL(5,2)  NOT NULL,
+                    credit_amount    DECIMAL(10,2) NOT NULL,
+                    remaining_credit DECIMAL(10,2) NOT NULL,
+                    created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (customer_id)      REFERENCES customer_accounts(customer_id)
+                        ON DELETE CASCADE ON UPDATE CASCADE,
+                    FOREIGN KEY (discount_plan_id) REFERENCES discount_plans(discount_plan_id)
+                        ON DELETE CASCADE ON UPDATE CASCADE
+                )
+                """);
+
+            // ── Column migrations (ADD IF NOT EXISTS) ─────────────────────────
+            addColumnIfMissing(conn, "payment_reminders", "eligible_after", "DATETIME NULL");
+
             System.out.println("[DatabaseManager] Migrations applied.");
         } catch (SQLException e) {
             System.err.println("[DatabaseManager] Could not run migrations: " + e.getMessage());

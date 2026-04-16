@@ -1,22 +1,23 @@
 package integration;
 
-import database.ProductDB;
-import domain.Product;
-import org.json.JSONArray;
-import org.json.JSONObject;
-
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-
-
+/**
+ * Placeholder for a future pull of CA product data from PU's cache on startup.
+ * The current sync direction is CA → PU (push via {@link PUSync}), so this
+ * pull step is not yet implemented.
+ *
+ * @see PUSync#syncWithPU()
+ */
 public class PUCachePull {
 
+    private PUCachePull() {}
+
+    /**
+     * Intended to pull pending product updates from PU into CA on startup.
+     * Not yet implemented — returns 0.
+     *
+     * @return number of products pulled (always 0 in this version)
+     */
     public static int pullCacheFromPU() {
-        System.out.println("[PUCachePull] Skipped.");
         return 0;
     }
-
 }

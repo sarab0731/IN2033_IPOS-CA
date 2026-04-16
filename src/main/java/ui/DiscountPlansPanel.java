@@ -6,12 +6,13 @@ import domain.DiscountTier;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.border.TitledBorder;
+import javax.swing.border.MatteBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 import java.awt.*;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 public class DiscountPlansPanel extends JPanel implements ThemeManager.ThemeListener {
@@ -21,25 +22,31 @@ public class DiscountPlansPanel extends JPanel implements ThemeManager.ThemeList
     private JPanel contentPanel;
     private JPanel leftPanel;
     private JPanel rightPanel;
-    private JPanel bottomControls;
 
-    // Plans table
+    // Plans card
+    private JPanel plansCard;
+    private JLabel plansTitle;
+    private JPanel plansBtnPanel;
     private JTable plansTable;
     private JScrollPane plansScrollPane;
     private DefaultTableModel plansModel;
 
-    // Tiers table (visible only when a FLEXIBLE plan is selected)
+    // Tiers card
+    private JPanel tiersCard;
+    private JLabel tiersTitle;
+    private JPanel tiersBtnPanel;
     private JTable tiersTable;
     private JScrollPane tiersScrollPane;
     private DefaultTableModel tiersModel;
-    private JPanel tiersCard;
-    private JLabel tiersTitle;
 
-    // Credits table
+    // Credits card
+    private JPanel creditsCard;
+    private JLabel creditsTitle;
+    private JPanel creditsFooter;
+    private JLabel meHint;
     private JTable creditsTable;
     private JScrollPane creditsScrollPane;
     private DefaultTableModel creditsModel;
-    private JPanel creditsCard;
 
     private JButton addBtn;
     private JButton editBtn;
@@ -71,20 +78,22 @@ public class DiscountPlansPanel extends JPanel implements ThemeManager.ThemeList
     }
 
     private JPanel buildContent() {
-        contentPanel = new JPanel(new BorderLayout(16, 16));
+        contentPanel = new JPanel(new BorderLayout(16, 0));
         contentPanel.setBorder(new EmptyBorder(8, 8, 8, 8));
 
         // ── Left: plans + tiers ──────────────────────────────────────────────
         leftPanel = new JPanel(new BorderLayout(0, 12));
         leftPanel.setOpaque(false);
+        leftPanel.setPreferredSize(new Dimension(440, 0));
 
-        JPanel plansCard = AppShell.createCard();
-        plansCard.setLayout(new BorderLayout());
-        plansCard.setBorder(new EmptyBorder(12, 12, 12, 12));
+        // Plans card
+        plansCard = AppShell.createCard();
+        plansCard.setLayout(new BorderLayout(0, 0));
+        plansCard.setBorder(new EmptyBorder(16, 16, 12, 16));
 
-        TitledBorder plansBorder = BorderFactory.createTitledBorder("Discount Plans");
-        plansBorder.setTitleFont(new Font("SansSerif", Font.BOLD, 13));
-        plansCard.setBorder(plansBorder);
+        plansTitle = new JLabel("Discount Plans");
+        plansTitle.setFont(new Font("SansSerif", Font.BOLD, 15));
+        plansTitle.setBorder(new EmptyBorder(0, 0, 10, 0));
 
         plansModel = new DefaultTableModel(
                 new String[]{"ID", "Plan Name", "Type", "Discount %", "Notes"}, 0
@@ -94,26 +103,32 @@ public class DiscountPlansPanel extends JPanel implements ThemeManager.ThemeList
         configureTable(plansTable);
         plansScrollPane = new JScrollPane(plansTable);
         styleScrollPane(plansScrollPane);
-        plansScrollPane.setPreferredSize(new Dimension(0, 200));
+        plansScrollPane.setPreferredSize(new Dimension(0, 180));
+
+        plansBtnPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        plansBtnPanel.setOpaque(false);
+        plansBtnPanel.setBorder(new EmptyBorder(8, 0, 0, 0));
+        addBtn     = createBtn("+ Add",    true);
+        editBtn    = createBtn("Edit",     false);
+        deleteBtn  = createBtn("Delete",   false);
+        refreshBtn = createBtn("Refresh",  false);
+        plansBtnPanel.add(addBtn);
+        plansBtnPanel.add(editBtn);
+        plansBtnPanel.add(deleteBtn);
+        plansBtnPanel.add(refreshBtn);
+
+        plansCard.add(plansTitle,     BorderLayout.NORTH);
         plansCard.add(plansScrollPane, BorderLayout.CENTER);
+        plansCard.add(plansBtnPanel,  BorderLayout.SOUTH);
 
-        JPanel planBtns = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        planBtns.setOpaque(false);
-        addBtn     = createBtn("Add Plan",    true);
-        editBtn    = createBtn("Edit Plan",   false);
-        deleteBtn  = createBtn("Delete Plan", false);
-        refreshBtn = createBtn("Refresh",     false);
-        planBtns.add(addBtn); planBtns.add(editBtn);
-        planBtns.add(deleteBtn); planBtns.add(refreshBtn);
-        plansCard.add(planBtns, BorderLayout.SOUTH);
-
-        // Tiers sub-panel (shown below plans when a FLEXIBLE plan is selected)
+        // Tiers card
         tiersCard = AppShell.createCard();
-        tiersCard.setLayout(new BorderLayout());
-        tiersCard.setBorder(new EmptyBorder(12, 12, 12, 12));
+        tiersCard.setLayout(new BorderLayout(0, 0));
+        tiersCard.setBorder(new EmptyBorder(16, 16, 12, 16));
+
         tiersTitle = new JLabel("Spend Tiers — select a FLEXIBLE plan");
-        tiersTitle.setFont(new Font("SansSerif", Font.BOLD, 13));
-        tiersCard.add(tiersTitle, BorderLayout.NORTH);
+        tiersTitle.setFont(new Font("SansSerif", Font.BOLD, 15));
+        tiersTitle.setBorder(new EmptyBorder(0, 0, 10, 0));
 
         tiersModel = new DefaultTableModel(
                 new String[]{"Tier ID", "Spend Band", "Rate %"}, 0
@@ -123,58 +138,64 @@ public class DiscountPlansPanel extends JPanel implements ThemeManager.ThemeList
         configureTable(tiersTable);
         tiersScrollPane = new JScrollPane(tiersTable);
         styleScrollPane(tiersScrollPane);
-        tiersScrollPane.setPreferredSize(new Dimension(0, 130));
-        tiersCard.add(tiersScrollPane, BorderLayout.CENTER);
+        tiersScrollPane.setPreferredSize(new Dimension(0, 110));
 
-        JPanel tierBtns = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        tierBtns.setOpaque(false);
-        addTierBtn    = createBtn("Add Tier",    true);
-        deleteTierBtn = createBtn("Delete Tier", false);
-        tierBtns.add(addTierBtn); tierBtns.add(deleteTierBtn);
-        tiersCard.add(tierBtns, BorderLayout.SOUTH);
+        tiersBtnPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        tiersBtnPanel.setOpaque(false);
+        tiersBtnPanel.setBorder(new EmptyBorder(8, 0, 0, 0));
+        addTierBtn    = createBtn("+ Add Tier",    true);
+        deleteTierBtn = createBtn("Delete Tier",   false);
+        tiersBtnPanel.add(addTierBtn);
+        tiersBtnPanel.add(deleteTierBtn);
+
+        tiersCard.add(tiersTitle,     BorderLayout.NORTH);
+        tiersCard.add(tiersScrollPane, BorderLayout.CENTER);
+        tiersCard.add(tiersBtnPanel,  BorderLayout.SOUTH);
 
         leftPanel.add(plansCard, BorderLayout.CENTER);
         leftPanel.add(tiersCard, BorderLayout.SOUTH);
 
-        // ── Right: credits log + month-end button ────────────────────────────
-        rightPanel = new JPanel(new BorderLayout(0, 8));
+        // ── Right: credits log ───────────────────────────────────────────────
+        rightPanel = new JPanel(new BorderLayout(0, 0));
         rightPanel.setOpaque(false);
 
         creditsCard = AppShell.createCard();
-        creditsCard.setLayout(new BorderLayout());
-        creditsCard.setBorder(new EmptyBorder(12, 12, 12, 12));
+        creditsCard.setLayout(new BorderLayout(0, 0));
+        creditsCard.setBorder(new EmptyBorder(16, 16, 12, 16));
 
-        TitledBorder creditsBorder = BorderFactory.createTitledBorder("Flexible Discount Credits");
-        creditsBorder.setTitleFont(new Font("SansSerif", Font.BOLD, 13));
-        creditsCard.setBorder(creditsBorder);
+        creditsTitle = new JLabel("Flexible Discount Credits");
+        creditsTitle.setFont(new Font("SansSerif", Font.BOLD, 15));
+        creditsTitle.setBorder(new EmptyBorder(0, 0, 10, 0));
 
         creditsModel = new DefaultTableModel(
                 new String[]{"Credit ID", "Cust. ID", "Customer", "Period",
-                             "Monthly Spend", "Rate", "Credit", "Remaining"}, 0
+                             "Monthly Spend", "Rate", "Credit", "Status", "Remaining"}, 0
         ) { @Override public boolean isCellEditable(int r, int c) { return false; } };
 
         creditsTable = new JTable(creditsModel);
         configureTable(creditsTable);
         creditsScrollPane = new JScrollPane(creditsTable);
         styleScrollPane(creditsScrollPane);
-        creditsCard.add(creditsScrollPane, BorderLayout.CENTER);
 
-        monthEndBtn = createBtn("Run Month-End Discounts", true);
-        JPanel meBtnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 6));
-        meBtnPanel.setOpaque(false);
-        JLabel meHint = new JLabel("Calculates flexible credits for a completed calendar month.");
+        // Footer row: hint + button
+        monthEndBtn = createBtn("Run Month-End", true);
+        meHint = new JLabel("Credits auto-process when opening this panel or at next sale.");
         meHint.setFont(new Font("SansSerif", Font.PLAIN, 11));
-        meBtnPanel.add(meHint);
-        meBtnPanel.add(Box.createHorizontalStrut(10));
-        meBtnPanel.add(monthEndBtn);
-        creditsCard.add(meBtnPanel, BorderLayout.SOUTH);
+
+        creditsFooter = new JPanel(new BorderLayout(10, 0));
+        creditsFooter.setOpaque(false);
+        creditsFooter.setBorder(new EmptyBorder(8, 0, 0, 0));
+        creditsFooter.add(meHint,      BorderLayout.CENTER);
+        creditsFooter.add(monthEndBtn, BorderLayout.EAST);
+
+        creditsCard.add(creditsTitle,    BorderLayout.NORTH);
+        creditsCard.add(creditsScrollPane, BorderLayout.CENTER);
+        creditsCard.add(creditsFooter,   BorderLayout.SOUTH);
 
         rightPanel.add(creditsCard, BorderLayout.CENTER);
 
-        // ── Assemble ─────────────────────────────────────────────────────────
         contentPanel.add(leftPanel,  BorderLayout.WEST);
         contentPanel.add(rightPanel, BorderLayout.CENTER);
-        leftPanel.setPreferredSize(new Dimension(440, 0));
 
         return contentPanel;
     }
@@ -225,6 +246,7 @@ public class DiscountPlansPanel extends JPanel implements ThemeManager.ThemeList
         addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override public void componentShown(java.awt.event.ComponentEvent e) {
                 loadPlansTable(); loadCreditsTable();
+                checkForUnprocessedMonth();
             }
         });
     }
@@ -351,12 +373,12 @@ public class DiscountPlansPanel extends JPanel implements ThemeManager.ThemeList
 
     private void showAddTierDialog(int planId) {
         JTextField minField  = new JTextField("0.00");
-        JTextField maxField  = new JTextField("(leave blank for no upper limit)");
+        JTextField maxField  = new JTextField("");
         JTextField rateField = new JTextField("1.00");
 
         Object[] fields = {
                 "Min spend £ (inclusive):", minField,
-                "Max spend £ (exclusive, blank = unlimited):", maxField,
+                "Max spend £ (blank = no upper limit):", maxField,
                 "Rate %:", rateField
         };
 
@@ -364,10 +386,10 @@ public class DiscountPlansPanel extends JPanel implements ThemeManager.ThemeList
         if (result != JOptionPane.OK_OPTION) return;
 
         try {
-            double min  = Double.parseDouble(minField.getText().trim());
+            double min    = Double.parseDouble(minField.getText().trim());
             String maxTxt = maxField.getText().trim();
-            Double max  = (maxTxt.isEmpty() || maxTxt.startsWith("(")) ? null : Double.parseDouble(maxTxt);
-            double rate = Double.parseDouble(rateField.getText().trim());
+            Double max    = maxTxt.isEmpty() ? null : Double.parseDouble(maxTxt);
+            double rate   = Double.parseDouble(rateField.getText().trim());
             if (DiscountPlanDB.addTier(planId, min, max, rate)) onPlanSelected();
             else JOptionPane.showMessageDialog(this, "Failed to add tier.");
         } catch (NumberFormatException ex) {
@@ -380,34 +402,46 @@ public class DiscountPlansPanel extends JPanel implements ThemeManager.ThemeList
         JSpinner yearSpinner  = new JSpinner(new SpinnerNumberModel(last.getYear(), 2020, 2099, 1));
         JSpinner monthSpinner = new JSpinner(new SpinnerNumberModel(last.getMonthValue(), 1, 12, 1));
 
-        Object[] fields = {
-                "Year:",  yearSpinner,
-                "Month (1–12):", monthSpinner
-        };
-
-        int result = JOptionPane.showConfirmDialog(this, fields,
+        int result = JOptionPane.showConfirmDialog(this,
+                new Object[]{"Year:", yearSpinner, "Month (1–12):", monthSpinner},
                 "Run Month-End Flexible Discounts", JOptionPane.OK_CANCEL_OPTION);
         if (result != JOptionPane.OK_OPTION) return;
 
         int year  = (int) yearSpinner.getValue();
         int month = (int) monthSpinner.getValue();
 
-        int created = DiscountPlanDB.processMonthEndCredits(year, month);
+        java.util.List<Object[]> credits = DiscountPlanDB.processMonthEndCredits(year, month);
         loadCreditsTable();
 
-        String msg = created > 0
-                ? created + " credit(s) generated for " + year + "-" + String.format("%02d", month)
-                    + ".\nCredits will be deducted from each customer's next invoice."
-                : "No new credits to generate for " + year + "-" + String.format("%02d", month)
-                    + ".\n(Already processed, or no flexible-plan sales in that month.)";
-        JOptionPane.showMessageDialog(this, msg,
-                "Month-End Complete", JOptionPane.INFORMATION_MESSAGE);
+        if (credits.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "No new credits for " + year + "-" + String.format("%02d", month)
+                    + ".\n(Already processed, or no flexible-plan sales in that month.)",
+                    "Month-End Complete", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder("<html><b>")
+                .append(credits.size()).append(" credit(s) generated for ")
+                .append(year).append("-").append(String.format("%02d", month))
+                .append("</b><br><br>");
+        for (Object[] c : credits) {
+            sb.append(String.format("• <b>%s</b>: £%.2f (%.1f%% of £%.2f)<br>",
+                    c[2], (double) c[6], (double) c[5], (double) c[4]));
+        }
+        sb.append("<br>Credits will be deducted from each customer's next order(s) automatically.</html>");
+        JOptionPane.showMessageDialog(this, sb.toString(), "Month-End Complete", JOptionPane.INFORMATION_MESSAGE);
     }
 
-    // ── Table helpers ────────────────────────────────────────────────────────
+    private void checkForUnprocessedMonth() {
+        DiscountPlanDB.autoProcessPastMonths(app.TimeManager.today());
+        loadCreditsTable();
+    }
+
+    // ── Styling helpers ──────────────────────────────────────────────────────
 
     private void configureTable(JTable t) {
-        t.setRowHeight(40);
+        t.setRowHeight(38);
         t.setShowGrid(true);
         t.setIntercellSpacing(new Dimension(1, 1));
         t.setFillsViewportHeight(true);
@@ -416,7 +450,7 @@ public class DiscountPlansPanel extends JPanel implements ThemeManager.ThemeList
         t.setDefaultEditor(Object.class, null);
         JTableHeader h = t.getTableHeader();
         h.setReorderingAllowed(false);
-        h.setFont(new Font("SansSerif", Font.BOLD, 13));
+        h.setFont(new Font("SansSerif", Font.BOLD, 12));
         h.setBorder(BorderFactory.createEmptyBorder());
         DefaultTableCellRenderer r = new DefaultTableCellRenderer();
         r.setHorizontalAlignment(SwingConstants.LEFT);
@@ -453,40 +487,71 @@ public class DiscountPlansPanel extends JPanel implements ThemeManager.ThemeList
         t.setDefaultRenderer(Object.class, r);
     }
 
-    private JButton createBtn(String text, boolean primary) {
-        JButton btn = new JButton(text);
+    private void styleBtn(JButton btn, boolean primary) {
+        btn.setOpaque(true);
         btn.setFocusPainted(false);
-        btn.setFont(new Font("SansSerif", Font.BOLD, 13));
+        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         if (primary) {
             btn.setBackground(ThemeManager.buttonDark());
             btn.setForeground(ThemeManager.textLight());
-            btn.setBorder(new EmptyBorder(10, 18, 10, 18));
+            btn.setBorder(new EmptyBorder(8, 16, 8, 16));
         } else {
             btn.setBackground(ThemeManager.buttonLight());
             btn.setForeground(ThemeManager.textPrimary());
             btn.setBorder(BorderFactory.createCompoundBorder(
                     BorderFactory.createLineBorder(ThemeManager.borderColor()),
-                    new EmptyBorder(10, 18, 10, 18)));
+                    new EmptyBorder(7, 14, 7, 14)));
         }
+    }
+
+    private JButton createBtn(String text, boolean primary) {
+        JButton btn = new JButton(text);
+        styleBtn(btn, primary);
         return btn;
     }
 
     @Override
     public void applyTheme() {
         setBackground(ThemeManager.appBackground());
-        if (contentPanel != null) contentPanel.setBackground(ThemeManager.appBackground());
-        if (leftPanel    != null) leftPanel.setBackground(ThemeManager.appBackground());
-        if (rightPanel   != null) rightPanel.setBackground(ThemeManager.appBackground());
-        if (tiersCard    != null) tiersCard.setBackground(ThemeManager.panelBackground());
-        if (creditsCard  != null) creditsCard.setBackground(ThemeManager.panelBackground());
-        if (tiersTitle   != null) tiersTitle.setForeground(ThemeManager.textPrimary());
-        if (plansScrollPane  != null) styleScrollPane(plansScrollPane);
-        if (tiersScrollPane  != null) styleScrollPane(tiersScrollPane);
-        if (creditsScrollPane!= null) styleScrollPane(creditsScrollPane);
+
+        if (contentPanel  != null) contentPanel.setBackground(ThemeManager.appBackground());
+        if (leftPanel     != null) leftPanel.setBackground(ThemeManager.appBackground());
+        if (rightPanel    != null) rightPanel.setBackground(ThemeManager.appBackground());
+
+        Color panel = ThemeManager.panelBackground();
+        if (plansCard     != null) plansCard.setBackground(panel);
+        if (tiersCard     != null) tiersCard.setBackground(panel);
+        if (creditsCard   != null) creditsCard.setBackground(panel);
+
+        if (plansBtnPanel  != null) plansBtnPanel.setBackground(panel);
+        if (tiersBtnPanel  != null) tiersBtnPanel.setBackground(panel);
+        if (creditsFooter  != null) creditsFooter.setBackground(panel);
+
+        Color text = ThemeManager.textPrimary();
+        if (plansTitle    != null) plansTitle.setForeground(text);
+        if (tiersTitle    != null) tiersTitle.setForeground(text);
+        if (creditsTitle  != null) creditsTitle.setForeground(text);
+        if (meHint        != null) meHint.setForeground(ThemeManager.textSecondary());
+
+        if (plansScrollPane   != null) styleScrollPane(plansScrollPane);
+        if (tiersScrollPane   != null) styleScrollPane(tiersScrollPane);
+        if (creditsScrollPane != null) styleScrollPane(creditsScrollPane);
+
         applyTableTheme(plansTable);
         applyTableTheme(tiersTable);
         applyTableTheme(creditsTable);
-        repaint(); revalidate();
+
+        // Re-apply button styles so they respond to theme changes
+        if (addBtn      != null) styleBtn(addBtn,      true);
+        if (editBtn     != null) styleBtn(editBtn,     false);
+        if (deleteBtn   != null) styleBtn(deleteBtn,   false);
+        if (refreshBtn  != null) styleBtn(refreshBtn,  false);
+        if (addTierBtn  != null) styleBtn(addTierBtn,  true);
+        if (deleteTierBtn != null) styleBtn(deleteTierBtn, false);
+        if (monthEndBtn != null) styleBtn(monthEndBtn, true);
+
+        repaint();
+        revalidate();
     }
 }

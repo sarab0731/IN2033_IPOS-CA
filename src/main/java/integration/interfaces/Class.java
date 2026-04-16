@@ -1,40 +1,17 @@
 package integration.interfaces;
 
-import integration.InventoryServiceImpl;
-import integration.OrderStatusImpl;
-import integration.StockServiceImpl;
-
+/**
+ * @deprecated Use {@link IntegrationServiceFactory} instead.
+ */
+@Deprecated
 public class Class {
 
-    public static IStockService getStockService() {
-        return new StockServiceImpl();
-    }
-
-    public static IInventoryService getInventoryService() {
-        return new InventoryServiceImpl();
-    }
-
-    public static IOrderStatus getOrderStatus() {
-        return new OrderStatusImpl();
-    }
-
-    public static IOrderService getOrderService() {
-        return new integration.Class.OrderServiceImpl();
-    }
-
-    public static IPaymentProcessing getPaymentProcessing() {
-        return new integration.Class.PaymentProcessingImpl();
-    }
-
-    public static IEmailService getEmailService() {
-        return new integration.Class.EmailServiceImpl();
-    }
-
-    public static ISMTPConnection getSMTPConnection() {
-        return new integration.Class.SMTPConnectionImpl();
-    }
-
-    public static ICommercialMembershipService getCommercialMembershipService() {
-        return new integration.Class.CommercialMembershipServiceImpl();
-    }
+    public static IStockService getStockService()                       { return IntegrationServiceFactory.getStockService(); }
+    public static IInventoryService getInventoryService()               { return IntegrationServiceFactory.getInventoryService(); }
+    public static IOrderStatus getOrderStatus()                         { return IntegrationServiceFactory.getOrderStatus(); }
+    public static IOrderService getOrderService()                       { return IntegrationServiceFactory.getOrderService(); }
+    public static IPaymentProcessing getPaymentProcessing()             { return IntegrationServiceFactory.getPaymentProcessing(); }
+    public static IEmailService getEmailService()                       { return IntegrationServiceFactory.getEmailService(); }
+    public static ISMTPConnection getSMTPConnection()                   { return IntegrationServiceFactory.getSMTPConnection(); }
+    public static ICommercialMembershipService getCommercialMembershipService() { return IntegrationServiceFactory.getCommercialMembershipService(); }
 }

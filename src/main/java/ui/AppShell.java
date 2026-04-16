@@ -63,6 +63,7 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
                     refreshUserInfo();
                     updateNavVisibility();
                     highlightActiveButton();
+                    refreshTimeTravelLabel();
                 }
             }
         });

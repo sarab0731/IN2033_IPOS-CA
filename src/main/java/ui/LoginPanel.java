@@ -142,6 +142,24 @@ public class LoginPanel extends JPanel {
                 msgLabel.setText(" ");
                 router.goTo(MainFrame.SCREEN_DASHBOARD);
 
+                // Check merchant SA balance after navigation so the dashboard renders first
+                SwingUtilities.invokeLater(() -> {
+                    domain.Merchant merchant = app.Session.getMerchant();
+                    if (merchant != null) {
+                        double balance = integration.SAApiClient.getBalance(merchant.getMerchantId());
+                        if (balance > 0) {
+                            JOptionPane.showMessageDialog(
+                                    SwingUtilities.getWindowAncestor(LoginPanel.this),
+                                    "Warning: You have an outstanding balance of £"
+                                            + String.format("%.2f", balance)
+                                            + " with InfoPharma SA.\n"
+                                            + "Please clear this balance to avoid account suspension.",
+                                    "Outstanding Balance Warning",
+                                    JOptionPane.WARNING_MESSAGE);
+                        }
+                    }
+                });
+
             } else {
                 msgLabel.setText("Invalid username or password.");
                 passwordField.setText("");
