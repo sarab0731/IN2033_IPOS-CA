@@ -23,13 +23,12 @@ websockify --web=/usr/share/novnc/ 6080 localhost:5900 &
 echo "============================================"
 echo "  IPOS-CA GUI → http://localhost:6080/vnc.html"
 echo "  VNC direct   → localhost:5901 (no password)"
-echo "  API server   → http://localhost:8083"
+echo "  API server   → http://localhost:8082"
 echo "============================================"
 
-# Launch the application (classpath includes all Maven dependencies)
+# Launch the application from the shaded jar
 exec java \
   -Djava.awt.headless=false \
   -Dawt.useSystemAAFontSettings=on \
   -Dswing.defaultlaf=javax.swing.plaf.metal.MetalLookAndFeel \
-  -cp "app.jar:dependency/*" \
-  app.Main
+  -jar app.jar

@@ -261,10 +261,10 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
                     tracking.isEmpty() ? "No tracking information available from SA." : tracking,
                     "Delivery Tracking — " + saOrderId, JOptionPane.INFORMATION_MESSAGE);
             if (!tracking.isEmpty()) {
-                String saStatus   = parseSAStatus(tracking);
+                String saStatus   = SASync.parseTrackedOrderStatus(tracking);
                 String localStatus = String.valueOf(historyModel.getValueAt(mRow, 3));
-                String mappedStatus = mapSAStatusToCA(saStatus);
-                if (mappedStatus != null && isStatusProgression(localStatus, mappedStatus)) {
+                String mappedStatus = SASync.mapSAStatusToCA(saStatus);
+                if (mappedStatus != null && SASync.isStatusProgression(localStatus, mappedStatus)) {
                     int sync = JOptionPane.showConfirmDialog(this,
                             "SA shows this order as: " + saStatus.toUpperCase()
                             + "\nLocal status:         " + localStatus
@@ -272,12 +272,7 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
                             "Sync Status from SA", JOptionPane.YES_NO_OPTION);
                     if (sync == JOptionPane.YES_OPTION) {
                         RestockOrderDB.updateStatus(selectedOrderId, localStatus, mappedStatus);
-                        if ("DELIVERED".equals(mappedStatus)) {
-                            List<RestockOrderItem> delivered = RestockOrderDB.getOrderItems(selectedOrderId);
-                            for (RestockOrderItem item : delivered)
-                                SASync.deductSAStock(item.getItemId(), item.getQuantity());
-                            refreshMerchantStatus();
-                        }
+                        if ("DELIVERED".equals(mappedStatus)) refreshMerchantStatus();
                         loadOrderHistory(historyModel);
                     }
                 }
@@ -336,10 +331,8 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
 
             RestockOrderDB.updateStatus(orderId, cur, next);
             if ("DELIVERED".equals(next)) {
-                List<RestockOrderItem> delivered = RestockOrderDB.getOrderItems(orderId);
-                for (RestockOrderItem item : delivered)
-                    SASync.deductSAStock(item.getItemId(), item.getQuantity());
                 refreshMerchantStatus();
+                List<RestockOrderItem> delivered = RestockOrderDB.getOrderItems(orderId);
                 JOptionPane.showMessageDialog(this,
                         "Delivery recorded. Stock updated for " + delivered.size() + " product(s).");
             }
@@ -788,35 +781,6 @@ public class OrdersPanel extends JPanel implements ThemeManager.ThemeListener {
         else { btn.setBackground(ThemeManager.buttonLight()); btn.setForeground(ThemeManager.textPrimary());
             btn.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(ThemeManager.borderColor()), new EmptyBorder(10,16,10,16))); }
         return btn;
-    }
-
-    /** Parses the "Status: xxx" line from SA's tracking text. */
-    private String parseSAStatus(String trackingText) {
-        if (trackingText == null) return null;
-        for (String line : trackingText.split("\n")) {
-            String t = line.trim();
-            if (t.startsWith("Status:")) return t.substring("Status:".length()).trim();
-        }
-        return null;
-    }
-
-    /** Maps SA status strings (lowercase) to CA status strings (uppercase). */
-    private String mapSAStatusToCA(String saStatus) {
-        if (saStatus == null) return null;
-        return switch (saStatus.toLowerCase()) {
-            case "pending"    -> "ACCEPTED";
-            case "accepted"   -> "PROCESSED";
-            case "dispatched" -> "DISPATCHED";
-            case "delivered"  -> "DELIVERED";
-            default           -> null;
-        };
-    }
-
-    /** Returns true if {@code next} is a later stage in the order lifecycle than {@code current}. */
-    private boolean isStatusProgression(String current, String next) {
-        if (next == null) return false;
-        java.util.List<String> stages = java.util.List.of("ACCEPTED", "PROCESSED", "DISPATCHED", "DELIVERED");
-        return stages.indexOf(next) > stages.indexOf(current);
     }
 
     @Override

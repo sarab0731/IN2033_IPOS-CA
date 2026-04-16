@@ -110,6 +110,8 @@ public class RestockOrderDB {
      */
     public static boolean updateStatus(int restockOrderId, String oldStatus, String newStatus) {
         String updateSql  = "UPDATE restock_orders SET status = ? WHERE restock_order_id = ?";
+        String checkReceivedSql = "SELECT stock_received FROM restock_orders WHERE restock_order_id = ?";
+        String markReceivedSql = "UPDATE restock_orders SET stock_received = 1 WHERE restock_order_id = ?";
         String historySql = """
             INSERT INTO order_status_history (restock_order_id, old_status, new_status)
             VALUES (?, ?, ?)
@@ -130,7 +132,20 @@ public class RestockOrderDB {
             histStmt.executeUpdate();
 
             if ("DELIVERED".equals(newStatus)) {
-                receiveStock(conn, restockOrderId);
+                boolean alreadyReceived = false;
+                try (PreparedStatement checkStmt = conn.prepareStatement(checkReceivedSql)) {
+                    checkStmt.setInt(1, restockOrderId);
+                    ResultSet rs = checkStmt.executeQuery();
+                    if (rs.next()) alreadyReceived = rs.getBoolean("stock_received");
+                }
+
+                if (!alreadyReceived) {
+                    receiveStock(conn, restockOrderId);
+                    try (PreparedStatement markStmt = conn.prepareStatement(markReceivedSql)) {
+                        markStmt.setInt(1, restockOrderId);
+                        markStmt.executeUpdate();
+                    }
+                }
             }
 
             conn.commit();
@@ -147,7 +162,7 @@ public class RestockOrderDB {
      */
     private static void receiveStock(Connection conn, int restockOrderId) throws SQLException {
         String itemsSql = "SELECT product_id, quantity FROM restock_order_items WHERE restock_order_id = ?";
-        String stockSql = "UPDATE products SET stock_quantity = stock_quantity + ? WHERE product_id = ?";
+        String stockSql = "UPDATE products SET stock_quantity = stock_quantity + ?, is_active = 1 WHERE product_id = ?";
 
         PreparedStatement itemsStmt = conn.prepareStatement(itemsSql);
         itemsStmt.setInt(1, restockOrderId);
@@ -287,6 +302,37 @@ public class RestockOrderDB {
             e.printStackTrace();
         }
         return null;
+    }
+
+    /**
+     * Returns all local restock orders that have been linked to an SA order and are not yet delivered.
+     */
+    public static List<RestockOrder> getActiveSAOrders() {
+        List<RestockOrder> list = new ArrayList<>();
+        String sql = """
+            SELECT * FROM restock_orders
+            WHERE sa_order_id IS NOT NULL AND sa_order_id <> '' AND status <> 'DELIVERED'
+            ORDER BY created_at DESC
+            """;
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                list.add(new RestockOrder(
+                        rs.getInt("restock_order_id"),
+                        rs.getString("order_number"),
+                        rs.getString("merchant_id"),
+                        rs.getString("status"),
+                        rs.getDouble("total_value"),
+                        rs.getString("created_at")
+                ));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
     }
 
     /**

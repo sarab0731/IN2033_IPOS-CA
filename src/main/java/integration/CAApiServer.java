@@ -20,7 +20,7 @@ import java.util.concurrent.Executors;
  * Embedded HTTP server exposing IPOS-CA stock and order-status endpoints
  * so that IPOS-PU can query and update CA data directly.
  *
- * Runs on port 8083 (SA occupies 8081, PU occupies 8080).
+ * Runs on port 8082 (SA occupies 8081, PU occupies 8080).
  *
  * Endpoints:
  *   GET  /api/stock/catalogue            – full product catalogue
