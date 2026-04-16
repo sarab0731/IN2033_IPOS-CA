@@ -21,6 +21,7 @@ services:
       start_period: 30s
 
   app:
+    build: .
     image: in2033_ipos-ca-app:latest
     entrypoint: ["/bin/bash", "/app/start.sh"]
     ports:

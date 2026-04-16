@@ -121,7 +121,7 @@ public class PaymentRemindersPanel extends JPanel implements ThemeManager.ThemeL
     }
 
     private void updateAccountStatuses() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = app.TimeManager.today();
 
         String sql = """
             SELECT i.customer_id, i.invoice_id, i.invoice_date, ca.account_status

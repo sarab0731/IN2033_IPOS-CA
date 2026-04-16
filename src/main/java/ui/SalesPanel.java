@@ -530,7 +530,14 @@ public class SalesPanel extends JPanel implements ThemeManager.ThemeListener {
                 double subtotalForDiscount = cart.entrySet().stream()
                         .mapToDouble(e -> e.getKey().getPrice() * e.getValue())
                         .sum();
-                discountAmount = subtotalForDiscount * (plan.getDiscountPercent() / 100.0);
+                if (plan.isFixed()) {
+                    // Fixed: apply rate immediately at point of sale
+                    discountAmount = subtotalForDiscount * (plan.getDiscountPercent() / 100.0);
+                } else if (plan.isFlexible()) {
+                    // Flexible: no discount at sale time — apply any pending month-end credit instead
+                    double pendingCredit = database.DiscountPlanDB.getPendingCredit(selectedCustomer.getCustomerId());
+                    discountAmount = Math.min(pendingCredit, subtotalForDiscount);
+                }
             }
         }
 
@@ -546,6 +553,15 @@ public class SalesPanel extends JPanel implements ThemeManager.ThemeListener {
         if (saleId == -1) {
             JOptionPane.showMessageDialog(this, "Sale failed. Please try again.");
             return;
+        }
+
+        // Consume flexible credit that was applied
+        if (accountSale && discountAmount > 0 && selectedCustomer != null
+                && selectedCustomer.getDiscountPlanId() > 0) {
+            domain.DiscountPlan plan = database.DiscountPlanDB.getById(selectedCustomer.getDiscountPlanId());
+            if (plan != null && plan.isFlexible()) {
+                database.DiscountPlanDB.consumeCredit(selectedCustomer.getCustomerId(), discountAmount);
+            }
         }
 
         if (accountSale) {

@@ -45,8 +45,8 @@ public class RestockOrderDB {
         String orderNumber = "RST-" + System.currentTimeMillis();
 
         String orderSql = """
-            INSERT INTO restock_orders (order_number, merchant_id, status, total_value)
-            VALUES (?, ?, 'ACCEPTED', ?)
+            INSERT INTO restock_orders (order_number, merchant_id, status, total_value, created_at)
+            VALUES (?, ?, 'ACCEPTED', ?, ?)
             """;
 
         String itemSql = """
@@ -70,6 +70,7 @@ public class RestockOrderDB {
             orderStmt.setString(1, orderNumber);
             orderStmt.setString(2, merchantId);
             orderStmt.setDouble(3, totalValue);
+            orderStmt.setTimestamp(4, java.sql.Timestamp.valueOf(app.TimeManager.now()));
             orderStmt.executeUpdate();
 
             ResultSet keys = orderStmt.getGeneratedKeys();

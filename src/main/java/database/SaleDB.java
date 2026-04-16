@@ -22,8 +22,8 @@ public class SaleDB {
 
         String saleSql = """
             INSERT INTO sales (customer_id, processed_by_user_id, sale_type,
-                payment_method, subtotal, discount_amount, vat_amount, total_amount)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                payment_method, subtotal, discount_amount, vat_amount, total_amount, sale_datetime)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
         String itemSql = """
@@ -65,6 +65,7 @@ public class SaleDB {
             saleStmt.setDouble(6, discountAmount);
             saleStmt.setDouble(7, vatAmount);
             saleStmt.setDouble(8, totalAmount);
+            saleStmt.setTimestamp(9, java.sql.Timestamp.valueOf(app.TimeManager.now()));
             saleStmt.executeUpdate();
 
             ResultSet keys = saleStmt.getGeneratedKeys();
@@ -134,8 +135,8 @@ public class SaleDB {
     public static String generateInvoice(int saleId, int customerId, double amountDue) {
         String num = "INV-" + System.currentTimeMillis();
         String sql = """
-            INSERT INTO invoices (invoice_number, customer_id, sale_id, amount_due, due_date, status)
-            VALUES (?, ?, ?, ?, DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'UNPAID')
+            INSERT INTO invoices (invoice_number, customer_id, sale_id, amount_due, invoice_date, due_date, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'UNPAID')
             """;
 
         try (Connection conn = DatabaseManager.getConnection();
@@ -145,6 +146,8 @@ public class SaleDB {
             stmt.setInt(2, customerId);
             stmt.setInt(3, saleId);
             stmt.setDouble(4, amountDue);
+            stmt.setDate(5, java.sql.Date.valueOf(app.TimeManager.today()));
+            stmt.setDate(6, java.sql.Date.valueOf(app.TimeManager.today().plusDays(30)));
             stmt.executeUpdate();
 
             CustomerDB.updateBalance(

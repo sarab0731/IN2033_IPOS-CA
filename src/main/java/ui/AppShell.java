@@ -1,6 +1,7 @@
 package ui;
 
 import app.Session;
+import app.TimeManager;
 import domain.Merchant;
 import domain.User;
 
@@ -27,6 +28,7 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
 
     private JButton toggleThemeBtn;
     private JButton logoutBtn;
+    private TimeTravelWidget timeTravelWidget;
 
     private final Map<String, JButton> navButtons = new LinkedHashMap<>();
 
@@ -166,6 +168,9 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         userNameLabel = new JLabel("Username");
         userNameLabel.setFont(new Font("SansSerif", Font.PLAIN, 13));
 
+        timeTravelWidget = new TimeTravelWidget(this::refreshTimeTravelLabel);
+
+        right.add(timeTravelWidget);
         right.add(infoIcon);
         right.add(bell);
         right.add(avatar);
@@ -388,12 +393,22 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
             applySidebarButtonTheme(logoutBtn);
         }
 
+
         setLogo();
         highlightActiveButton();
 
-        SwingUtilities.updateComponentTreeUI(this);
+        refreshTimeTravelLabel();
         repaint();
         revalidate();
+    }
+
+    private void refreshTimeTravelLabel() {
+        if (timeTravelWidget != null) timeTravelWidget.refresh();
+    }
+
+    private void resetTime() {
+        TimeManager.reset();
+        refreshTimeTravelLabel();
     }
 
     private void showMerchantInfoPopup(JLabel anchor) {

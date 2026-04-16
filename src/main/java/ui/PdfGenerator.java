@@ -28,6 +28,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import app.TimeManager;
 
 public class PdfGenerator {
 
@@ -64,7 +65,7 @@ public class PdfGenerator {
             doc.add(para(COMPANY_FAX, regular, 11));
             doc.add(spacer(8));
             doc.add(para("IPOS Account: " + order.getMerchantId(), regular, 11));
-            doc.add(para("Date: " + LocalDate.now().format(DISPLAY_DATE), regular, 11));
+            doc.add(para("Date: " + TimeManager.today().format(DISPLAY_DATE), regular, 11));
             doc.add(spacer(16));
 
             float[] colWidths = {120f, 200f, 70f, 80f, 80f};
@@ -179,7 +180,7 @@ public class PdfGenerator {
             doc.add(header);
 
             doc.add(spacer(16));
-            doc.add(para(LocalDate.now().format(DISPLAY_DATE), regular, 11)
+            doc.add(para(TimeManager.today().format(DISPLAY_DATE), regular, 11)
                     .setTextAlignment(TextAlignment.RIGHT));
             doc.add(spacer(16));
             doc.add(para("Dear " + customer.getFullName() + ",", regular, 11));

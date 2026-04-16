@@ -177,7 +177,7 @@ public class ReportsPanel extends JPanel implements ThemeManager.ThemeListener {
                             com.itextpdf.io.font.constants.StandardFonts.HELVETICA);
 
             doc.add(PdfGenerator.para("IPOS-CA Report — " + activeReport, bold, 14));
-            doc.add(PdfGenerator.para("Generated: " + java.time.LocalDate.now(), regular, 10));
+            doc.add(PdfGenerator.para("Generated: " + app.TimeManager.today(), regular, 10));
             doc.add(PdfGenerator.spacer(12));
 
             // Build column widths

@@ -25,6 +25,42 @@ CREATE TABLE IF NOT EXISTS discount_plans (
     CHECK (discount_percent >= 0)
     ) ;
 
+-- Spend-band tiers for FLEXIBLE discount plans.
+-- Each row defines: if monthly spend >= min_spend (and < next tier's min_spend), apply rate%.
+-- max_spend NULL means no upper limit (highest tier).
+CREATE TABLE IF NOT EXISTS discount_plan_tiers (
+    tier_id INT AUTO_INCREMENT PRIMARY KEY,
+    discount_plan_id INT NOT NULL,
+    min_spend DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    max_spend DECIMAL(10,2) NULL,
+    rate DECIMAL(5,2) NOT NULL,
+    CHECK (min_spend >= 0),
+    CHECK (rate >= 0),
+    FOREIGN KEY (discount_plan_id) REFERENCES discount_plans(discount_plan_id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- Discount credits earned by flexible-plan customers at month end.
+-- remaining_credit counts down as it is applied to subsequent invoices.
+CREATE TABLE IF NOT EXISTS flexible_discount_credits (
+    credit_id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    discount_plan_id INT NOT NULL,
+    period_year INT NOT NULL,
+    period_month INT NOT NULL,
+    monthly_spend DECIMAL(10,2) NOT NULL,
+    rate_applied DECIMAL(5,2) NOT NULL,
+    credit_amount DECIMAL(10,2) NOT NULL,
+    remaining_credit DECIMAL(10,2) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (credit_amount >= 0),
+    CHECK (remaining_credit >= 0),
+    FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (discount_plan_id) REFERENCES discount_plans(discount_plan_id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 -- ---------------------------------------------------------
 -- 3. CUSTOMER ACCOUNTS
 -- ---------------------------------------------------------
