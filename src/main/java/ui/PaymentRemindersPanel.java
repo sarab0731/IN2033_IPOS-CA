@@ -78,7 +78,7 @@ public class PaymentRemindersPanel extends JPanel implements ThemeManager.ThemeL
         tableCard.setLayout(new BorderLayout());
 
         tableModel = new DefaultTableModel(
-                new String[]{"Customer ID", "Account No.", "Full Name", "Status", "Balance £", "Reminder Type", "Reminder Status", "Invoice ID"},
+                new String[]{"Customer ID", "Full Name", "Status", "Balance £", "Reminder Type", "Reminder Status", "Invoice ID"},
                 0
         ) {
             @Override public boolean isCellEditable(int row, int col) { return false; }
@@ -252,7 +252,7 @@ public class PaymentRemindersPanel extends JPanel implements ThemeManager.ThemeL
         tableModel.setRowCount(0);
 
         String sql = """
-            SELECT ca.customer_id, ca.account_number, ca.full_name, ca.account_status,
+            SELECT ca.customer_id, ca.full_name, ca.account_status,
                    ca.current_balance, pr.reminder_type, pr.reminder_status, pr.invoice_id
             FROM payment_reminders pr
             JOIN customer_accounts ca ON pr.customer_id = ca.customer_id
@@ -266,7 +266,6 @@ public class PaymentRemindersPanel extends JPanel implements ThemeManager.ThemeL
             while (rs.next()) {
                 tableModel.addRow(new Object[]{
                         rs.getInt("customer_id"),
-                        rs.getString("account_number"),
                         rs.getString("full_name"),
                         rs.getString("account_status"),
                         String.format("%.2f", rs.getDouble("current_balance")),
