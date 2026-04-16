@@ -705,32 +705,32 @@ public class LoginPanel extends JPanel {
 
     private static class UserFieldIcon implements Icon {
         private final Color color = new Color(150, 150, 150);
-        @Override public int getIconWidth() { return 18; }
-        @Override public int getIconHeight() { return 18; }
+        @Override public int getIconWidth()  { return 22; }
+        @Override public int getIconHeight() { return 22; }
         @Override
         public void paintIcon(Component c, Graphics g, int x, int y) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(color);
-            g2.fillOval(x + 4, y, 10, 10);
-            g2.drawOval(x + 4, y, 10, 10);
-            g2.drawArc(x + 2, y + 8, 14, 10, 0, -180);
+            g2.fillOval(x + 5, y + 1, 12, 12);
+            g2.drawOval(x + 5, y + 1, 12, 12);
+            g2.drawArc(x + 2, y + 10, 18, 12, 0, -180);
             g2.dispose();
         }
     }
 
     private static class LockFieldIcon implements Icon {
         private final Color color = new Color(150, 150, 150);
-        @Override public int getIconWidth() { return 18; }
-        @Override public int getIconHeight() { return 18; }
+        @Override public int getIconWidth()  { return 22; }
+        @Override public int getIconHeight() { return 22; }
         @Override
         public void paintIcon(Component c, Graphics g, int x, int y) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(color);
             g2.setStroke(new BasicStroke(1.8f));
-            g2.drawRoundRect(x + 3, y + 8, 12, 8, 3, 3);
-            g2.drawArc(x + 5, y + 2, 8, 10, 0, 180);
+            g2.drawRoundRect(x + 3, y + 10, 16, 10, 4, 4);
+            g2.drawArc(x + 6, y + 2, 10, 12, 0, 180);
             g2.dispose();
         }
     }
@@ -743,21 +743,21 @@ public class LoginPanel extends JPanel {
             this.open = open;
         }
 
-        @Override public int getIconWidth() { return 18; }
-        @Override public int getIconHeight() { return 18; }
+        @Override public int getIconWidth()  { return 22; }
+        @Override public int getIconHeight() { return 22; }
 
         @Override
         public void paintIcon(Component c, Graphics g, int x, int y) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(color);
-            g2.setStroke(new BasicStroke(1.5f));
-            g2.drawArc(x + 1, y + 4, 16, 10, 0, 180);
-            g2.drawArc(x + 1, y + 4, 16, 10, 0, -180);
+            g2.setStroke(new BasicStroke(1.6f));
+            g2.drawArc(x + 1, y + 5, 20, 12, 0,  180);
+            g2.drawArc(x + 1, y + 5, 20, 12, 0, -180);
             if (open) {
-                g2.fillOval(x + 7, y + 7, 4, 4);
+                g2.fillOval(x + 9, y + 9, 4, 4);
             } else {
-                g2.drawLine(x + 3, y + 15, x + 15, y + 3);
+                g2.drawLine(x + 3, y + 18, x + 18, y + 3);
             }
             g2.dispose();
         }

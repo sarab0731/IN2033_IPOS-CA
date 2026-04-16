@@ -215,6 +215,21 @@ public class CustomerDB {
         );
     }
 
+    /**
+     * Resets all PENDING reminders to NO_NEED for a customer who has paid in full
+     * and whose account status is not IN_DEFAULT (spec requirement).
+     */
+    public static void clearPendingReminders(int customerId) {
+        String sql = "UPDATE payment_reminders SET reminder_status = 'NO_NEED' WHERE customer_id = ? AND reminder_status = 'PENDING'";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, customerId);
+            stmt.executeUpdate();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public static boolean deleteCustomer(int customerId) {
         // Check for linked records
         String checkSql = """

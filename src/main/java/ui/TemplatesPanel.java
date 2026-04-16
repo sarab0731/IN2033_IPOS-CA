@@ -17,7 +17,7 @@ public class TemplatesPanel extends JPanel implements ThemeManager.ThemeListener
                     "REMINDER - INVOICE NO.: {invoice_number}\n" +
                     "Account: {account_number}    Total Amount: £{amount_due}\n\n" +
                     "According to our records, we have not yet received payment of the above invoice.\n" +
-                    "We would appreciate payment at your earliest convenience.\n\n" +
+                    "Please ensure full payment is received by {payment_date}.\n\n" +
                     "If you have already sent a payment to us recently, please accept our apologies.\n\n" +
                     "Yours sincerely,\n{signed_by}";
 
@@ -26,7 +26,7 @@ public class TemplatesPanel extends JPanel implements ThemeManager.ThemeListener
                     "SECOND REMINDER - INVOICE NO.: {invoice_number}\n" +
                     "Account: {account_number}    Total Amount: £{amount_due}\n\n" +
                     "It appears we still have not received payment of the above invoice, despite our previous reminder.\n" +
-                    "We would appreciate it if you would settle this invoice in full by return.\n\n" +
+                    "We must insist that full payment of £{amount_due} is received no later than {payment_date}.\n\n" +
                     "If you have already sent a payment to us recently, please accept our apologies.\n\n" +
                     "Yours sincerely,\n{signed_by}";
 
@@ -72,7 +72,7 @@ public class TemplatesPanel extends JPanel implements ThemeManager.ThemeListener
 
         hintLabel = new JLabel(
                 "<html>Available placeholders: <b>{customer_name}</b>, <b>{invoice_number}</b>, " +
-                        "<b>{account_number}</b>, <b>{amount_due}</b>, <b>{signed_by}</b>, " +
+                        "<b>{account_number}</b>, <b>{amount_due}</b>, <b>{payment_date}</b>, <b>{signed_by}</b>, " +
                         "<b>{pharmacy_name}</b>, <b>{pharmacy_address}</b>, <b>{pharmacy_phone}</b>, <b>{pharmacy_email}</b></html>"
         );
         hintLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));

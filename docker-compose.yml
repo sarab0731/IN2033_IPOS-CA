@@ -10,6 +10,7 @@ services:
       MYSQL_ROOT_HOST: '%'
     volumes:
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./sql/02_migrations.sql:/docker-entrypoint-initdb.d/02_migrations.sql
       - mysql_data:/var/lib/mysql
     tmpfs:
       - /var/run/mysqld

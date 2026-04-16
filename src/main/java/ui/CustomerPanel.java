@@ -445,6 +445,7 @@ public class CustomerPanel extends JPanel implements ThemeManager.ThemeListener 
             // Auto-restore status after payment
             if ("SUSPENDED".equals(customer.getAccountStatus()) && newBalance == 0) {
                 CustomerDB.updateStatus(customerId, "ACTIVE");
+                CustomerDB.clearPendingReminders(customerId);  // spec: reset reminders when account not in default
             } else if ("IN_DEFAULT".equals(customer.getAccountStatus())) {
                 if (Session.isManagerOrAdmin() && newBalance == 0) {
                     CustomerDB.updateStatus(customerId, "ACTIVE");

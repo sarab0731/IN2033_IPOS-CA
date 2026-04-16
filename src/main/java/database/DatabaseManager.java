@@ -57,4 +57,30 @@ public class DatabaseManager {
     public static Connection getConnection() throws SQLException {
         return DriverManager.getConnection(URL, USER, PASSWORD);
     }
+
+    /**
+     * Applies incremental DDL migrations on every startup.
+     * Uses JDBC metadata checks so re-runs are always safe.
+     */
+    public static void runMigrations() {
+        try (Connection conn = getConnection()) {
+            addColumnIfMissing(conn, "payment_reminders", "eligible_after",
+                    "DATETIME NULL");
+            System.out.println("[DatabaseManager] Migrations applied.");
+        } catch (SQLException e) {
+            System.err.println("[DatabaseManager] Could not run migrations: " + e.getMessage());
+        }
+    }
+
+    private static void addColumnIfMissing(Connection conn, String table, String column,
+                                           String definition) throws SQLException {
+        try (java.sql.ResultSet cols = conn.getMetaData().getColumns(null, null, table, column)) {
+            if (cols.next()) return; // column already exists
+        }
+        String sql = "ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition;
+        try (java.sql.Statement stmt = conn.createStatement()) {
+            stmt.execute(sql);
+            System.out.println("[DatabaseManager] Added column: " + table + "." + column);
+        }
+    }
 }

@@ -14,6 +14,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class PaymentRemindersPanel extends JPanel implements ThemeManager.ThemeListener {
 
@@ -123,126 +127,184 @@ public class PaymentRemindersPanel extends JPanel implements ThemeManager.ThemeL
     private void updateAccountStatuses() {
         LocalDate today = app.TimeManager.today();
 
+        // --- Phase 1: collect all unpaid invoices (close ResultSet before any writes) ---
         String sql = """
             SELECT i.customer_id, i.invoice_id, i.invoice_date, ca.account_status
             FROM invoices i
             JOIN customer_accounts ca ON i.customer_id = ca.customer_id
             WHERE i.status <> 'PAID'
+            ORDER BY i.customer_id, i.invoice_date
             """;
 
+        List<Map<String, Object>> rows = new ArrayList<>();
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
-
             while (rs.next()) {
-                LocalDate invoiceDate = LocalDate.parse(rs.getString("invoice_date").substring(0, 10));
-                long daysPast = java.time.temporal.ChronoUnit.DAYS.between(invoiceDate, today);
-                int customerId = rs.getInt("customer_id");
-                int invoiceId = rs.getInt("invoice_id");
-                String accountStatus = rs.getString("account_status");
+                Map<String, Object> row = new HashMap<>();
+                row.put("customer_id",    rs.getInt("customer_id"));
+                row.put("invoice_id",     rs.getInt("invoice_id"));
+                row.put("invoice_date",   rs.getString("invoice_date"));
+                row.put("account_status", rs.getString("account_status"));
+                rows.add(row);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return;
+        }
 
-                if (daysPast >= 30 && !"IN_DEFAULT".equals(accountStatus)) {
-                    CustomerDB.updateStatus(customerId, "IN_DEFAULT");
-                    ensureReminderExists(conn, customerId, invoiceId, "SECOND");
-                }
-                if (daysPast < 15 && "SUSPENDED".equals(accountStatus)) {
-                    // Check if balance is now 0
-                    String balSql = "SELECT current_balance FROM customer_accounts WHERE customer_id = ?";
-                    try (PreparedStatement balStmt = conn.prepareStatement(balSql)) {
-                        balStmt.setInt(1, customerId);
-                        ResultSet balRs = balStmt.executeQuery();
-                        if (balRs.next() && balRs.getDouble("current_balance") == 0) {
-                            CustomerDB.updateStatus(customerId, "ACTIVE");
-                        }
+        // --- Phase 2: process with a fresh connection ---
+        // effectiveStatus tracks per-customer status changes made this run,
+        // so a newer invoice can't downgrade a status set by an older invoice.
+        Map<Integer, String> effectiveStatus = new HashMap<>();
+
+        try (Connection conn = DatabaseManager.getConnection()) {
+            for (Map<String, Object> row : rows) {
+                int    customerId   = (int)    row.get("customer_id");
+                int    invoiceId    = (int)    row.get("invoice_id");
+                String dateStr      = (String) row.get("invoice_date");
+                LocalDate invoiceDate = LocalDate.parse(dateStr.substring(0, 10));
+
+                // Calendar-month boundaries:
+                //   Invoices from month M are due end-of-M.
+                //   SUSPENDED threshold  = 15th of M+1  (day after 15th triggers suspension)
+                //   IN_DEFAULT threshold = last day of M+1
+                LocalDate firstOfNextMonth  = invoiceDate.withDayOfMonth(1).plusMonths(1);
+                LocalDate suspendedThreshold = firstOfNextMonth.withDayOfMonth(15);
+                LocalDate defaultThreshold   = firstOfNextMonth.withDayOfMonth(
+                        firstOfNextMonth.lengthOfMonth());
+
+                String status = effectiveStatus.getOrDefault(customerId,
+                        (String) row.get("account_status"));
+
+                if (today.isAfter(defaultThreshold)) {
+                    // Past end of M+1 → IN_DEFAULT + queue both reminders
+                    if (!"IN_DEFAULT".equals(status)) {
+                        CustomerDB.updateStatus(customerId, "IN_DEFAULT");
+                        effectiveStatus.put(customerId, "IN_DEFAULT");
                     }
+                    ensureReminderExists(conn, customerId, invoiceId, "FIRST",  null);
+                    ensureReminderExists(conn, customerId, invoiceId, "SECOND", null);
+
+                } else if (today.isAfter(suspendedThreshold)) {
+                    // Past 15th of M+1 → SUSPENDED + queue first reminder
+                    if ("ACTIVE".equals(status)) {
+                        CustomerDB.updateStatus(customerId, "SUSPENDED");
+                        effectiveStatus.put(customerId, "SUSPENDED");
+                    }
+                    ensureReminderExists(conn, customerId, invoiceId, "FIRST", null);
                 }
-                else if (daysPast >= 15 && "ACTIVE".equals(accountStatus)) {
-                    CustomerDB.updateStatus(customerId, "SUSPENDED");
-                    ensureReminderExists(conn, customerId, invoiceId, "FIRST");
-                }
+                // Before 15th of M+1 → still within grace period, no action
+                // Restoration (SUSPENDED→ACTIVE, IN_DEFAULT→ACTIVE) is handled
+                // in CustomerPanel when payment is recorded, not here.
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private void ensureReminderExists(Connection conn, int customerId, int invoiceId, String reminderType) throws Exception {
-        String checkSql = "SELECT COUNT(*) FROM payment_reminders WHERE customer_id = ? AND invoice_id = ? AND reminder_type = ?";
-        String insertSql = """
-            INSERT INTO payment_reminders (customer_id, invoice_id, reminder_type, reminder_status)
-            VALUES (?, ?, ?, 'PENDING')
-            """;
+    /** Inserts a PENDING reminder if one does not already exist for this customer/invoice/type. */
+    private void ensureReminderExists(Connection conn, int customerId, int invoiceId,
+                                      String reminderType, java.sql.Timestamp eligibleAfter) throws Exception {
+        String checkSql = "SELECT COUNT(*) FROM payment_reminders WHERE customer_id = ? AND invoice_id = ? AND reminder_type = ? AND reminder_status != 'NO_NEED'";
+        String insertSql = "INSERT INTO payment_reminders (customer_id, invoice_id, reminder_type, reminder_status, eligible_after) VALUES (?, ?, ?, 'PENDING', ?)";
 
         try (PreparedStatement check = conn.prepareStatement(checkSql)) {
             check.setInt(1, customerId);
             check.setInt(2, invoiceId);
             check.setString(3, reminderType);
             ResultSet rs = check.executeQuery();
-            if (rs.next() && rs.getInt(1) > 0) {
-                return;
-            }
+            if (rs.next() && rs.getInt(1) > 0) return;
         }
 
         try (PreparedStatement insert = conn.prepareStatement(insertSql)) {
             insert.setInt(1, customerId);
             insert.setInt(2, invoiceId);
             insert.setString(3, reminderType);
+            insert.setTimestamp(4, eligibleAfter); // null = immediately eligible
             insert.executeUpdate();
         }
     }
 
     private int sendDueReminders() {
-        int count = 0;
+        LocalDate today = app.TimeManager.today();
 
+        // Collect all PENDING reminders that are now eligible (2nd reminders respect their eligible_after date)
+        List<Map<String, Object>> due = new ArrayList<>();
         String fetchSql = """
-            SELECT pr.reminder_id, pr.reminder_type, ca.customer_id, ca.full_name, i.invoice_number, i.amount_due
+            SELECT pr.reminder_id, pr.reminder_type, ca.customer_id, ca.full_name,
+                   pr.invoice_id, i.invoice_number, i.amount_due
             FROM payment_reminders pr
             JOIN customer_accounts ca ON pr.customer_id = ca.customer_id
-            JOIN invoices i ON pr.invoice_id = i.invoice_id
+            JOIN invoices i           ON pr.invoice_id  = i.invoice_id
             WHERE pr.reminder_status = 'PENDING'
-            """;
-
-        String updateSql = """
-            UPDATE payment_reminders
-            SET reminder_status = 'SENT', sent_at = CURRENT_TIMESTAMP
-            WHERE reminder_id = ?
+              AND (pr.eligible_after IS NULL OR pr.eligible_after <= ?)
             """;
 
         try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement fetch = conn.prepareStatement(fetchSql);
-             PreparedStatement update = conn.prepareStatement(updateSql);
-             ResultSet rs = fetch.executeQuery()) {
-
-            while (rs.next()) {
-                int reminderType = "FIRST".equals(rs.getString("reminder_type")) ? 1 : 2;
-                String template  = TemplatesPanel.getReminderTemplate(reminderType);
-
-                String content = template
-                        .replace("{customer_name}",  rs.getString("full_name"))
-                        .replace("{invoice_number}", rs.getString("invoice_number"))
-                        .replace("{account_number}", String.valueOf(rs.getInt("customer_id")))
-                        .replace("{amount_due}",     String.format("%.2f", rs.getDouble("amount_due")))
-                        .replace("{signed_by}",      "Pharmacy Manager");
-
-                JTextArea area = new JTextArea(content);
-                area.setEditable(false);
-                area.setFont(new Font("Monospaced", Font.PLAIN, 12));
-                area.setMargin(new java.awt.Insets(10, 10, 10, 10));
-                area.setPreferredSize(new java.awt.Dimension(480, 280));
-
-                JOptionPane.showMessageDialog(
-                        this,
-                        new javax.swing.JScrollPane(area),
-                        rs.getString("reminder_type") + " Reminder — " + rs.getString("full_name"),
-                        JOptionPane.INFORMATION_MESSAGE
-                );
-
-                update.setInt(1, rs.getInt("reminder_id"));
-                update.executeUpdate();
-                count++;
+             PreparedStatement fetch = conn.prepareStatement(fetchSql)) {
+            fetch.setDate(1, java.sql.Date.valueOf(today));
+            try (ResultSet rs = fetch.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("reminder_id",    rs.getInt("reminder_id"));
+                    row.put("reminder_type",  rs.getString("reminder_type"));
+                    row.put("customer_id",    rs.getInt("customer_id"));
+                    row.put("full_name",      rs.getString("full_name"));
+                    row.put("invoice_id",     rs.getInt("invoice_id"));
+                    row.put("invoice_number", rs.getString("invoice_number"));
+                    row.put("amount_due",     rs.getDouble("amount_due"));
+                    due.add(row);
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
+            return 0;
+        }
+
+        if (due.isEmpty()) return 0;
+
+        String updateSql = "UPDATE payment_reminders SET reminder_status = 'SENT', sent_at = ? WHERE reminder_id = ?";
+        int count = 0;
+
+        for (Map<String, Object> reminder : due) {
+            String reminderType = (String) reminder.get("reminder_type");
+            int    typeNum      = "FIRST".equals(reminderType) ? 1 : 2;
+            String template     = TemplatesPanel.getReminderTemplate(typeNum);
+            LocalDate paymentDate = today.plusDays(7);
+
+            String content = template
+                    .replace("{customer_name}",  (String) reminder.get("full_name"))
+                    .replace("{invoice_number}", (String) reminder.get("invoice_number"))
+                    .replace("{account_number}", String.valueOf(reminder.get("customer_id")))
+                    .replace("{amount_due}",     String.format("%.2f", (Double) reminder.get("amount_due")))
+                    .replace("{payment_date}",   paymentDate.toString())
+                    .replace("{signed_by}",      "Pharmacy Manager");
+
+            JTextArea area = new JTextArea(content);
+            area.setEditable(false);
+            area.setFont(new Font("Monospaced", Font.PLAIN, 12));
+            area.setMargin(new java.awt.Insets(10, 10, 10, 10));
+            area.setPreferredSize(new java.awt.Dimension(480, 280));
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    new JScrollPane(area),
+                    reminderType + " Reminder — " + reminder.get("full_name"),
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            // Mark this reminder as sent
+            try (Connection conn = DatabaseManager.getConnection();
+                 PreparedStatement update = conn.prepareStatement(updateSql)) {
+                update.setTimestamp(1, java.sql.Timestamp.valueOf(app.TimeManager.now()));
+                update.setInt(2, (int) reminder.get("reminder_id"));
+                update.executeUpdate();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            count++;
         }
 
         return count;

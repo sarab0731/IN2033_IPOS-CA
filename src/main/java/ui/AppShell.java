@@ -26,8 +26,6 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
     private JLabel userNameLabel;
     private JLabel logoLabel;
     private JLabel infoIconLabel;
-    private JLabel bellIconLabel;
-    private JLabel avatarLabel;
 
     private JButton toggleThemeBtn;
     private JButton logoutBtn;
@@ -161,12 +159,6 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
             }
         });
 
-        bellIconLabel = new JLabel(new BellIcon(16, ThemeManager.textSecondary()));
-        bellIconLabel.setBorder(new EmptyBorder(0, 2, 0, 2));
-
-        avatarLabel = new JLabel(new AvatarDotIcon(14, ThemeManager.buttonDark()));
-        avatarLabel.setBorder(new EmptyBorder(0, 4, 0, 2));
-
         userNameLabel = new JLabel("Username");
         userNameLabel.setFont(new Font("SansSerif", Font.PLAIN, 13));
 
@@ -174,8 +166,6 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
 
         right.add(timeTravelWidget);
         right.add(infoIconLabel);
-        right.add(bellIconLabel);
-        right.add(avatarLabel);
         right.add(userNameLabel);
 
         top.add(left, BorderLayout.WEST);
@@ -230,16 +220,16 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
     private JButton createSidebarButton(String text, Runnable action) {
         JButton btn = new JButton(text);
         btn.setAlignmentX(Component.LEFT_ALIGNMENT);
-        btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 48));
-        btn.setPreferredSize(new Dimension(140, 48));
+        btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
+        btn.setPreferredSize(new Dimension(140, 32));
         btn.setHorizontalAlignment(SwingConstants.LEFT);
         btn.setFocusPainted(false);
         btn.setBorderPainted(false);
         btn.setContentAreaFilled(true);
         btn.setOpaque(true);
-        btn.setFont(new Font("SansSerif", Font.BOLD, 14));
+        btn.setFont(new Font("SansSerif", Font.PLAIN, 12));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setBorder(new EmptyBorder(10, 16, 10, 16));
+        btn.setBorder(new EmptyBorder(6, 12, 6, 12));
 
         applySidebarButtonTheme(btn);
 
@@ -388,13 +378,6 @@ public class AppShell extends JPanel implements ThemeManager.ThemeListener {
         if (infoIconLabel != null) {
             infoIconLabel.setIcon(new InfoIcon(16, ThemeManager.textSecondary()));
         }
-        if (bellIconLabel != null) {
-            bellIconLabel.setIcon(new BellIcon(16, ThemeManager.textSecondary()));
-        }
-        if (avatarLabel != null) {
-            avatarLabel.setIcon(new AvatarDotIcon(14, ThemeManager.buttonDark()));
-        }
-
         if (toggleThemeBtn != null) {
             toggleThemeBtn.setText(getThemeToggleLabel());
             applySidebarButtonTheme(toggleThemeBtn);

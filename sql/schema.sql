@@ -255,18 +255,19 @@ CREATE TABLE IF NOT EXISTS restock_order_items (
 -- Reminder workflow for overdue invoices
 -- ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS payment_reminders (
-                                                 reminder_id INT AUTO_INCREMENT PRIMARY KEY,
-                                                 customer_id INT NOT NULL,
-                                                 invoice_id INT NOT NULL,
-                                                 reminder_type VARCHAR(20) NOT NULL,
+    reminder_id     INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id     INT NOT NULL,
+    invoice_id      INT NOT NULL,
+    reminder_type   VARCHAR(20) NOT NULL,
     reminder_status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    sent_at DATETIME,
-    CHECK (reminder_type IN ('FIRST', 'SECOND')),
+    sent_at         DATETIME,
+    eligible_after  DATETIME NULL,
+    CHECK (reminder_type   IN ('FIRST', 'SECOND')),
     CHECK (reminder_status IN ('PENDING', 'SENT', 'NO_NEED')),
     FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id)
-    ON DELETE RESTRICT ON UPDATE CASCADE,
-    FOREIGN KEY (invoice_id) REFERENCES invoices(invoice_id)
-    ON DELETE RESTRICT ON UPDATE CASCADE
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (invoice_id)  REFERENCES invoices(invoice_id)
+        ON DELETE RESTRICT ON UPDATE CASCADE
     ) ;
 
 -- ---------------------------------------------------------

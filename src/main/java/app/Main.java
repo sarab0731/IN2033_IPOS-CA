@@ -1,5 +1,6 @@
 package app;
 
+import database.DatabaseManager;
 import database.DatabaseSetup;
 import database.MerchantDB;
 import domain.Merchant;
@@ -16,6 +17,7 @@ public class Main {
     public static void main(String[] args) {
 
         DatabaseSetup.initialise();
+        DatabaseManager.runMigrations();
         CAApiServer.start();
 
         // Sync with SA: pull catalogue cache, verify merchant statuses, refresh financials
