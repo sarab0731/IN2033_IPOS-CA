@@ -47,8 +47,7 @@ public class PdfGenerator {
     public static void generateOrderForm(Component parent,
                                          RestockOrder order,
                                          List<RestockOrderItem> items) {
-        File dest = chooseSaveFile(parent, "order-form-" + order.getOrderNumber() + ".pdf");
-        if (dest == null) return;
+        File dest = exportsFile("order-form-" + order.getOrderNumber() + ".pdf");
 
         try {
             PdfFont regular = PdfFontFactory.createFont(StandardFonts.HELVETICA);
@@ -147,8 +146,7 @@ public class PdfGenerator {
                                              double vatAmount,
                                              double amountDue,
                                              String signedBy) {
-        File dest = chooseSaveFile(parent, "invoice-" + invoiceNumber + ".pdf");
-        if (dest == null) return;
+        File dest = exportsFile("invoice-" + invoiceNumber + ".pdf");
 
         try {
             PdfFont regular = PdfFontFactory.createFont(StandardFonts.HELVETICA);
@@ -259,16 +257,16 @@ public class PdfGenerator {
     // Helpers
     // -------------------------------------------------------------------------
 
+    /** Returns a File inside the exports directory, creating it if needed. */
+    static File exportsFile(String filename) {
+        File dir = new File("/app/exports");
+        if (!dir.exists()) dir.mkdirs();
+        return new File(dir, filename);
+    }
+
+    /** @deprecated Use exportsFile() — kept for compatibility with ReportsPanel. */
     static File chooseSaveFile(Component parent, String defaultName) {
-        JFileChooser chooser = new JFileChooser();
-        chooser.setSelectedFile(new File(defaultName));
-        int result = chooser.showSaveDialog(parent);
-        if (result != JFileChooser.APPROVE_OPTION) return null;
-        File f = chooser.getSelectedFile();
-        if (!f.getName().toLowerCase().endsWith(".pdf")) {
-            f = new File(f.getAbsolutePath() + ".pdf");
-        }
-        return f;
+        return exportsFile(defaultName);
     }
 
     static Paragraph para(String text, PdfFont font, float size) {

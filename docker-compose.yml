@@ -33,6 +33,7 @@ services:
         condition: service_healthy
     volumes:
       - ./database:/app/database
+      - ./exports:/app/exports
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

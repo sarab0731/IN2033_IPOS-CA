@@ -195,7 +195,7 @@ public class PaymentRemindersPanel extends JPanel implements ThemeManager.ThemeL
         int count = 0;
 
         String fetchSql = """
-            SELECT pr.reminder_id, pr.reminder_type, ca.full_name, ca.account_number, i.invoice_number, i.amount_due
+            SELECT pr.reminder_id, pr.reminder_type, ca.customer_id, ca.full_name, i.invoice_number, i.amount_due
             FROM payment_reminders pr
             JOIN customer_accounts ca ON pr.customer_id = ca.customer_id
             JOIN invoices i ON pr.invoice_id = i.invoice_id
@@ -220,7 +220,7 @@ public class PaymentRemindersPanel extends JPanel implements ThemeManager.ThemeL
                 String content = template
                         .replace("{customer_name}",  rs.getString("full_name"))
                         .replace("{invoice_number}", rs.getString("invoice_number"))
-                        .replace("{account_number}", rs.getString("account_number"))
+                        .replace("{account_number}", String.valueOf(rs.getInt("customer_id")))
                         .replace("{amount_due}",     String.format("%.2f", rs.getDouble("amount_due")))
                         .replace("{signed_by}",      "Pharmacy Manager");
 

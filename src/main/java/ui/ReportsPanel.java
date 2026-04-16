@@ -160,8 +160,7 @@ public class ReportsPanel extends JPanel implements ThemeManager.ThemeListener {
             return;
         }
 
-        java.io.File dest = PdfGenerator.chooseSaveFile(this, "report-" + activeReport.toLowerCase() + ".pdf");
-        if (dest == null) return;
+        java.io.File dest = PdfGenerator.exportsFile("report-" + activeReport.toLowerCase() + ".pdf");
 
         try {
             com.itextpdf.kernel.pdf.PdfDocument pdf =
