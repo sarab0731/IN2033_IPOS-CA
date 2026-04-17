@@ -46,7 +46,7 @@ public class PUApiClient {
                 }
             }
         } catch (Exception e) {
-            System.err.println("[PUApiClient] Could not reach PU system: " + e.getMessage());
+            System.err.println("[PUApiClient] Could not reach PU system: " + e.toString());
         }
         return orders;
     }
@@ -69,7 +69,7 @@ public class PUApiClient {
             HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
             return response.statusCode() >= 200 && response.statusCode() < 300;
         } catch (Exception e) {
-            System.err.println("[PUApiClient] updateOrderStatus failed: " + e.getMessage());
+            System.err.println("[PUApiClient] updateOrderStatus failed: " + e.toString());
             return false;
         }
     }
@@ -101,7 +101,7 @@ public class PUApiClient {
             if (body.contains("declined")) return "declined";
             return response.statusCode() >= 200 && response.statusCode() < 300 ? "success" : "declined";
         } catch (Exception e) {
-            System.err.println("[PUApiClient] processCardPayment failed: " + e.getMessage());
+            System.err.println("[PUApiClient] processCardPayment failed: " + e.toString());
             return "error";
         }
     }
@@ -128,7 +128,7 @@ public class PUApiClient {
             HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
             return response.statusCode() >= 200 && response.statusCode() < 300;
         } catch (Exception e) {
-            System.err.println("[PUApiClient] sendEmail failed: " + e.getMessage());
+            System.err.println("[PUApiClient] sendEmail failed: " + e.toString());
             return false;
         }
     }
@@ -151,7 +151,7 @@ public class PUApiClient {
                 return new JSONArray(response.body());
             }
         } catch (Exception e) {
-            System.err.println("[PUApiClient] getPendingStockChanges failed: " + e.getMessage());
+            System.err.println("[PUApiClient] getPendingStockChanges failed: " + e.toString());
         }
         return new JSONArray();
     }
@@ -169,7 +169,7 @@ public class PUApiClient {
             HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
             return response.statusCode() >= 200 && response.statusCode() < 300;
         } catch (Exception e) {
-            System.err.println("[PUApiClient] clearAllPendingChanges failed: " + e.getMessage());
+            System.err.println("[PUApiClient] clearAllPendingChanges failed: " + e.toString());
             return false;
         }
     }
@@ -188,7 +188,7 @@ public class PUApiClient {
             HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
             return response.statusCode() >= 200 && response.statusCode() < 300;
         } catch (Exception e) {
-            System.err.println("[PUApiClient] pushProductsToCache failed: " + e.getMessage());
+            System.err.println("[PUApiClient] pushProductsToCache failed: " + e.toString());
             return false;
         }
     }
