@@ -14,7 +14,7 @@ Other features include full stock management with low-stock alerts, customer acc
 ## Run from command line
  
 ```bash
-docker compose up
+docker compose up --build
 ```
   
 ## Login Details
