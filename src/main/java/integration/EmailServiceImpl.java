@@ -1,5 +1,8 @@
 package integration;
 
+// AI-assisted: used Claude to learn how to implement IEmailService by delegating
+// to the SMTP client and handling delivery failures gracefully.
+
 import integration.interfaces.IEmailService;
 
 /**

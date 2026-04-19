@@ -1,5 +1,8 @@
 package ui;
 
+// AI-assisted: used Claude for a quick fix when the app shell was not painting
+// child panels after navigation — resolved by calling revalidate/repaint.
+
 import app.Session;
 import app.TimeManager;
 import domain.Merchant;

@@ -1,5 +1,8 @@
 package integration;
 
+// AI-assisted: used Claude to learn how to configure an SMTP connection and
+// send transactional emails through the external comms subsystem.
+
 import integration.interfaces.ISMTPConnection;
 
 /**

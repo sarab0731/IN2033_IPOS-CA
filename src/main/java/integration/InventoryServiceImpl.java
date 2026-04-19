@@ -1,5 +1,8 @@
 package integration;
 
+// AI-assisted: used Claude to learn how to implement the inventory service
+// interface and wire it to the database layer for stock lookups and updates.
+
 import database.DatabaseManager;
 import database.ProductDB;
 import domain.CatalogueItem;

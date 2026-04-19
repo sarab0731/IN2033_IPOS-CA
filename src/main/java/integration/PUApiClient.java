@@ -1,5 +1,8 @@
 package integration;
 
+// AI-assisted: used Claude to learn how to make outbound HTTP requests in Java,
+// parse JSON arrays from a remote API, and map them to domain objects.
+
 import domain.PUOrder;
 import domain.PUOrder.PUOrderItem;
 import org.json.JSONArray;

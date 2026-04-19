@@ -1,5 +1,8 @@
 package integration;
 
+// AI-assisted: used Claude to learn how to implement the commercial membership
+// flow, including DB persistence and email notification on submission.
+
 import integration.interfaces.ICommercialMembershipService;
 
 /**

@@ -1,5 +1,8 @@
 package integration;
 
+// AI-assisted: used Claude to learn how to track and update order status
+// transitions via JDBC and expose them through the IOrderStatus interface.
+
 import database.DatabaseManager;
 import integration.interfaces.IOrderStatus;
 

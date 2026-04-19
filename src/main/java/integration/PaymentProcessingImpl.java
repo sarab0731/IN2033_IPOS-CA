@@ -1,5 +1,8 @@
 package integration;
 
+// AI-assisted: used Claude to learn how to implement a payment processing
+// service and integrate it with the external payment API endpoint.
+
 import integration.interfaces.IPaymentProcessing;
 
 /**

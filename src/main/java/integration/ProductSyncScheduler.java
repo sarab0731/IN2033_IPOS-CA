@@ -1,5 +1,8 @@
 package integration;
 
+// AI-assisted: used Claude to learn how to schedule a background task with
+// ScheduledExecutorService to periodically sync product data.
+
 import database.ProductDB;
 import domain.Product;
 import org.json.JSONArray;

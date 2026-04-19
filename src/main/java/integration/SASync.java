@@ -1,5 +1,8 @@
 package integration;
 
+// AI-assisted: used Claude to learn how to structure a sync service that pulls
+// remote data from the SA subsystem and reconciles it with the local DB.
+
 import database.DatabaseManager;
 import database.MerchantDB;
 import database.ProductDB;

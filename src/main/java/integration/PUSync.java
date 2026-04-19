@@ -1,5 +1,8 @@
 package integration;
 
+// AI-assisted: used Claude to learn how to implement a one-way data sync from
+// the local database out to the PU subsystem via HTTP POST.
+
 import database.DatabaseManager;
 import database.ProductDB;
 import domain.Product;

@@ -1,5 +1,8 @@
 package integration;
 
+// AI-assisted: used Claude to learn how to write a mapper that converts between
+// JSON payloads from external APIs and internal domain objects.
+
 import domain.CatalogueItem;
 import domain.Product;
 import org.json.JSONObject;

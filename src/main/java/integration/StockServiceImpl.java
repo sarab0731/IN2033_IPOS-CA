@@ -1,5 +1,8 @@
 package integration;
 
+// AI-assisted: used Claude to learn how to implement the stock service and keep
+// local stock levels in sync with what the SA subsystem exposes.
+
 import database.DatabaseManager;
 import database.ProductDB;
 import domain.CatalogueItem;

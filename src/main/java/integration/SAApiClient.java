@@ -1,5 +1,8 @@
 package integration;
 
+// AI-assisted: used Claude to learn how to call the SA subsystem REST endpoints
+// and deserialise the JSON responses into usable Java objects.
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 

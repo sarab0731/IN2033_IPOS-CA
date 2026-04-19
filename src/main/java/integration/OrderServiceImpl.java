@@ -1,5 +1,8 @@
 package integration;
 
+// AI-assisted: used Claude to learn how to implement the IOrderService interface
+// and handle the full order lifecycle against the database layer.
+
 import integration.interfaces.IOrderService;
 import domain.DiscountPlan;
 import org.json.JSONArray;

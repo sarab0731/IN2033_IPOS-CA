@@ -1,5 +1,8 @@
 package ui;
 
+// AI-assisted: used Claude for a quick fix when the main window was not
+// rendering correctly — helped resolve a CardLayout panel visibility issue.
+
 import javax.swing.*;
 import java.awt.*;
 

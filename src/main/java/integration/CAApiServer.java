@@ -1,5 +1,8 @@
 package integration;
 
+// AI-assisted: used Claude to learn how to build an embedded HTTP server with
+// com.sun.net.httpserver, register route handlers, and return JSON responses.
+
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import database.DatabaseManager;
